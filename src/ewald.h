@@ -12,9 +12,10 @@
 class Ewald {
 	public:
 		Ewald(double _Lx, double _Ly, double _alpha, bool _verbose=false);
-		void computeForcesNaive(
+		static void computeForcesNaive(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
-			std::vector<double> &forces_x, std::vector<double> &forces_y);
+			std::vector<double> &forces_x, std::vector<double> &forces_y,
+			double Lx, double Ly); 
 		void computeForces(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y);

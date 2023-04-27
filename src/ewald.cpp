@@ -1,6 +1,8 @@
 #include <iostream>
+#include <iomanip>
 #include <cmath>
 #include "ewald.h"
+
 
 Ewald::Ewald(double _Lx, double _Ly, double _alpha, bool _verbose) :
 	Lx(_Lx), Ly(_Ly), alpha(_alpha), verbose(_verbose),
@@ -100,8 +102,8 @@ void Ewald::computeSelfInteraction() {
 			if (r2 > 0 && r2 < rRange2A) {
 				px = x * x / r2;
 				py = x * y / r2;
-				force_self_x += (2 * px - 1) / r2;
-				force_self_y += 2 * py / r2;
+				force_self_x += (2 * px - 1) / r2 / (2. * M_PI);
+				force_self_y += 2 * py / r2 / (2. * M_PI);
 			}
 		}
 	}
@@ -110,7 +112,8 @@ void Ewald::computeSelfInteraction() {
 /* Direct computation of the forces */
 void Ewald::computeForcesNaive(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
-		std::vector<double> &forces_x, std::vector<double> &forces_y) {
+		std::vector<double> &forces_x, std::vector<double> &forces_y,
+		double Lx, double Ly) {
 	long N = pos_x.size();
 
 	for (long i = 0 ; i < N ; ++i) {
@@ -128,7 +131,14 @@ void Ewald::computeForcesNaive(
 		for (long j = 0 ; j <= i ; ++j) {
 			dx = pos_x[i] - pos_x[j];
 			dy = pos_y[i] - pos_y[j];
-			enforcePBC(dx, dy);
+			if (dx > Lx / 2.)
+				dx -= Lx;
+			else if (dx < -Lx / 2.)
+				dx += Lx;
+			if (dy > Ly / 2.)
+				dy -= Ly;
+			else if (dy < -Ly / 2.)
+				dy += Ly;
 			fx = 0;
 			fy = 0;
 			for (long a = -hi_xA ; a <= hi_xA ; ++a) {
@@ -139,15 +149,17 @@ void Ewald::computeForcesNaive(
 					if (r2 > 0 && r2 < rRange2A) {
 						px = x * x / r2;
 						py = x * y / r2;
-						fx += (2 * px - 1) / r2;
-						fy += 2 * py / r2;
+						fx += (2 * px - 1) / r2 / (2. * M_PI);
+						fy += 2 * py / r2 / (2. * M_PI);
 					}
 				}
 			}
 			forces_x[i] += fx;
 			forces_y[i] += fy;
-			forces_x[j] += fx;
-			forces_y[j] += fy;
+			if (j != i) {
+				forces_x[j] += fx;
+				forces_y[j] += fy;
+			}
 		}
 	}
 }
@@ -226,7 +238,7 @@ void Ewald::addFourierForces(
 
 	// Constant contribution
 	for (long i = 0 ; i < N ; ++i) {
-		forces_x[i] += fForceAvg_x;
+		forces_x[i] += (N - 1) * fForceAvg_x;
 	}
 }
 
@@ -289,22 +301,33 @@ void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
 
 int testEwald() {
 	double Lx = 1., Ly = 1.;
-	double alpha = 3;
-	Ewald ew(Lx, Ly, alpha, false);
+	std::vector<double> alphas = {1, 1.5, 2., 2.5, 3};
 
-	std::vector<double> pos_x = {0.2, 0.4};
+	/*std::vector<double> pos_x = {0.2, 0.4};
 	std::vector<double> pos_y = {0.3, 0.7};
-	std::vector<double> force_x(2, 0.), force_y(2, 0.);
+	std::vector<double> force_x(2, 0.), force_y(2, 0.);*/
+	/*std::vector<double> pos_x = {0.77354243, 0.2401132, 0.76776071};
+	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104};
+	std::vector<double> force_x(3, 0.), force_y(3, 0.);*/
+	std::vector<double> pos_x = {0.77354243, 0.2401132, 0.76776071, 0.27041645,
+		                         0.74654512};
+	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104, 0.83511414,
+		                         0.75500363};
+	std::vector<double> force_x(5, 0.), force_y(5, 0.);
 
-	ew.computeForcesNaive(pos_x, pos_y, force_x, force_y);
-	for (long i = 0 ; i < 2 ; ++i) {
-		std::cout << force_x[i] << " " << force_y[i] << "\n";
+	Ewald::computeForcesNaive(pos_x, pos_y, force_x, force_y, Lx, Ly);
+	for (size_t i = 0 ; i < pos_x.size() ; ++i) {
+		std::cout << std::setprecision(10)
+			<< force_x[i] << " " << force_y[i] << "\n";
 	}
-	std::cout << "\n";
 
-	ew.computeForces(pos_x, pos_y, force_x, force_y);
-	for (long i = 0 ; i < 2 ; ++i) {
-		std::cout << force_x[i] << " " << force_y[i] << "\n";
+	for (double alpha : alphas) {
+		Ewald ew(Lx, Ly, alpha, false);
+		ew.computeForces(pos_x, pos_y, force_x, force_y);
+		for (size_t i = 0 ; i < pos_x.size() ; ++i) {
+			std::cout << std::setprecision(10)
+				<< force_x[i] << " " << force_y[i] << "\n";
+		}
 	}
 
 	return 0;

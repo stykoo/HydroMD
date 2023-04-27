@@ -1,0 +1,15 @@
+HydroMD
+*.o
+*.dat
+*.h5
+*.log
+*.cmake
+*.swp
+*.swo
+*.out*
+Makefile
+CMakeCache.txt
+CMakeFiles
+bin/
+html/
+latex/
