@@ -2,6 +2,7 @@
 #include <boost/program_options.hpp>
 // #include "observables.h"
 #include "simul.h"
+#include "ewald.h"
 #include "state.h"
 
 namespace po = boost::program_options;
@@ -36,6 +37,7 @@ Simul::Simul(int argc, char **argv) {
 		("output,O",
 		 po::value<std::string>(&output)->default_value("observables.h5"),
 		 "Name of the output file")
+		("test", po::bool_switch(&test), "Test mode")
 		("help,h", "Print help message and exit")
 		;
 
@@ -82,6 +84,11 @@ void Simul::run() {
 		          << std::endl;
 		return;
 	}
+	if (test) {
+		testEwald();
+		return;
+	}
+
 	// Initialize the state of the system
 	State state(len_x, len_y, n_parts, pot_strength, dt);
 	/*Observables obs(len, n_parts, step_r, n_div_angle, less_obs,

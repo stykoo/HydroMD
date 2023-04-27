@@ -36,6 +36,7 @@ class Simul {
 		long n_iters_th; //!< Number of time iterations of thermalization
 		long skip; //!< Iterations between two computation of observables
 		std::string output; //!< Name of the output file
+		bool test; //!< Test mode
 
 		SimulInitStatus status; //!< Status after initialization
 };

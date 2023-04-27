@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 
-PROJECT(ActiveBrownian)
+PROJECT(HydroMD)
 
-set(EXECUTABLE_NAME_NOVISU "HydroMD")
+set(EXECUTABLE_NAME "HydroMD")
 
 # Build in release mode by default
 if(NOT CMAKE_BUILD_TYPE)
@@ -13,8 +13,6 @@ set(EXECUTABLE_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
 set(CMAKE_CXX_FLAGS "-W -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
 set(CMAKE_CXX_FLAGS_DEBUG "-Ofast -g -pg") # Profiling
-
-# This is not a strict requirement
 set(CMAKE_CXX_STANDARD 14)
 
 # Packages needed
@@ -29,23 +27,23 @@ include_directories(${MKL_INCLUDE_DIRS})
 
 file(
 	GLOB
-	source_files_novisu
+	source_files
 	src/*
 )
 
 add_executable(
-	${EXECUTABLE_NAME_NOVISU}
-	${source_files_novisu}
+	${EXECUTABLE_NAME}
+	${source_files}
 )
 
 if(MKL_FOUND)
-	target_compile_definitions(${EXECUTABLE_NAME_NOVISU} PRIVATE USE_MKL)
-	target_link_libraries(${EXECUTABLE_NAME_NOVISU} -Wl,--start-group ${MKL_LIBRARIES} -Wl,--end-group pthread dl)
+	target_compile_definitions(${EXECUTABLE_NAME} PRIVATE USE_MKL)
+	target_link_libraries(${EXECUTABLE_NAME} -Wl,--start-group ${MKL_LIBRARIES} -Wl,--end-group pthread dl)
 endif()
 
 
 target_link_libraries(
-	${EXECUTABLE_NAME_NOVISU}
+	${EXECUTABLE_NAME}
 	#${HDF5_LIBRARIES}
 	${Boost_LIBRARIES}
 )
