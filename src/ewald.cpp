@@ -4,8 +4,8 @@
 #include "ewald.h"
 
 
-Ewald::Ewald(double _Lx, double _Ly, double _alpha, bool _verbose) :
-	Lx(_Lx), Ly(_Ly), alpha(_alpha), verbose(_verbose),
+Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
+	Lx(_Lx), Ly(_Ly), alpha(_alpha), N(_N), verbose(_verbose), 
 	Lx2(_Lx / 2.), Ly2(_Ly / 2), alpha2(_alpha * _alpha)
 {
 	double safety = -std::log(EWALD_ERROR);
@@ -57,6 +57,9 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, bool _verbose) :
 	// Structure factor (real and imaginary parts)
 	Sr.resize(nk);
 	Si.resize(nk);
+	sp.resize(N * nk); // scalar products G.R
+	cc.resize(N * nk); // cos(G.r)
+	ss.resize(N * nk); // sin(G.r)
 	
 
 	// Self interaction
@@ -167,7 +170,6 @@ void Ewald::computeForcesNaive(
 void Ewald::computeForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
-	long N = pos_x.size();
 
 	// Self interaction
 	for (long i = 0 ; i < N ; ++i) {
@@ -186,46 +188,28 @@ void Ewald::computeForces(
 void Ewald::addFourierForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
-	long N = pos_x.size();
-	long Nall = N * nk; 
+	/*long Nall = N * nk; 
 	sp.resize(Nall); // scalar products G.R
 	cc.resize(Nall); // cos(G.r)
-	ss.resize(Nall); // sin(G.r)
+	ss.resize(Nall); // sin(G.r)*/
 
-	// Scalar products
-	long k = 0;
-	for (long q = 0 ; q < nk ; ++q) {
-		for (long i = 0 ; i < N ; ++i) {
-			sp[k] = pos_x[i] * fVecs_x[q] + pos_y[i] * fVecs_y[q];
-			++k;
-		}
-	}
+	calcScalarProd(pos_x, pos_y);
 
 	// Sin and cos
 #ifdef USE_MKL
-	vdSinCos(Nall, sp.data(), ss.data(), cc.data());
+	vdSinCos(N * nk, sp.data(), ss.data(), cc.data());
 #else
-	for (k = 0 ; k < Nall ; ++k) {
+	for (k = 0 ; k < N * nk ; ++k) {
 		cc[k] = std::cos(sp[k]);
 		ss[k] = std::sin(sp[k]);
 	}
 #endif
 
-	// Structure factor
-	k = 0;
-	for (long q = 0 ; q < nk ; ++q) {
-		Sr[q] = 0.;
-		Si[q] = 0.;
-		for (long i = 0 ; i < N ; ++i) {
-			Sr[q] += cc[k];
-			Si[q] += ss[k];
-			++k;
-		}
-	}
-	
+	calcStructFac();
+
 	// Forces
 	double z;
-	k = 0;
+	long k = 0;
 	for (long q = 0 ; q < nk ; ++q) {
 		for (long i = 0 ; i < N ; ++i) {
 			z = Sr[q] * cc[k] + Si[q] * ss[k];
@@ -242,10 +226,36 @@ void Ewald::addFourierForces(
 	}
 }
 
+void Ewald::calcScalarProd(
+		const std::vector<double> &pos_x, const std::vector<double> &pos_y) {
+	// Scalar products
+	long k = 0;
+	for (long q = 0 ; q < nk ; ++q) {
+		for (long i = 0 ; i < N ; ++i) {
+			sp[k] = pos_x[i] * fVecs_x[q] + pos_y[i] * fVecs_y[q];
+			++k;
+		}
+	}
+}
+
+void Ewald::calcStructFac() {
+	// Structure factor
+	long k = 0;
+	for (long q = 0 ; q < nk ; ++q) {
+		Sr[q] = 0.;
+		Si[q] = 0.;
+		for (long i = 0 ; i < N ; ++i) {
+			Sr[q] += cc[k];
+			Si[q] += ss[k];
+			++k;
+		}
+	}
+}
+
+
 void Ewald::addRealForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
-	long N = pos_x.size();
 	double dx, dy, fx, fy;
 
 	for (long i = 0 ; i < N ; ++i) {
@@ -300,9 +310,11 @@ void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
 }
 
 int testEwald() {
+	//double Lx = 1.5, Ly = 1.;
 	double Lx = 1., Ly = 1.;
 	std::vector<double> alphas = {1, 1.5, 2., 2.5, 3};
 
+	long N = 5;
 	/*std::vector<double> pos_x = {0.2, 0.4};
 	std::vector<double> pos_y = {0.3, 0.7};
 	std::vector<double> force_x(2, 0.), force_y(2, 0.);*/
@@ -313,22 +325,32 @@ int testEwald() {
 		                         0.74654512};
 	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104, 0.83511414,
 		                         0.75500363};
-	std::vector<double> force_x(5, 0.), force_y(5, 0.);
+	std::vector<double> force_x0(N, 0.), force_y0(N, 0.);
+	std::vector<double> force_x(N, 0.), force_y(N, 0.);
 
-	Ewald::computeForcesNaive(pos_x, pos_y, force_x, force_y, Lx, Ly);
+	Ewald::computeForcesNaive(pos_x, pos_y, force_x0, force_y0, Lx, Ly);
 	for (size_t i = 0 ; i < pos_x.size() ; ++i) {
 		std::cout << std::setprecision(10)
-			<< force_x[i] << " " << force_y[i] << "\n";
+			<< force_x0[i] << " " << force_y0[i] << "\n";
 	}
 
+	double max_err = 0., err;
 	for (double alpha : alphas) {
-		Ewald ew(Lx, Ly, alpha, false);
+		Ewald ew(Lx, Ly, alpha, N, false);
 		ew.computeForces(pos_x, pos_y, force_x, force_y);
 		for (size_t i = 0 ; i < pos_x.size() ; ++i) {
 			std::cout << std::setprecision(10)
 				<< force_x[i] << " " << force_y[i] << "\n";
+			err = std::abs(force_x[i] - force_x0[i]);
+			if (err > max_err)
+				max_err = err;
+			err = std::abs(force_y[i] - force_y0[i]);
+			if (err > max_err)
+				max_err = err;
 		}
 	}
+
+	std::cout << "Maximal error: " << max_err << "\n";
 
 	return 0;
 }

@@ -30,13 +30,16 @@ class Simul {
 		double len_x; //!< Length in x direction
 		double len_y; //!< Length in y direction
 		long n_parts; //!< Number of particles
-		double pot_strength; //!< Strength of interparticle potential
+		double radius; //!< Radius of particle
+		double WCA_strength; //!< Strength of the WCA potential
+		double alpha_ew; //!< Parameter of Ewald algorithm
 		double dt; //!< Timestep
 		long n_iters; //!< Number of time iterations
 		long n_iters_th; //!< Number of time iterations of thermalization
 		long skip; //!< Iterations between two computation of observables
 		std::string output; //!< Name of the output file
 		bool test; //!< Test mode
+		bool verbose; //!< Verbose mode
 
 		SimulInitStatus status; //!< Status after initialization
 };

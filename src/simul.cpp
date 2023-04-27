@@ -25,8 +25,12 @@ Simul::Simul(int argc, char **argv) {
 		("ly", po::value<double>(&len_y)->default_value(1.0), "")
 		("parts,n", po::value<long>(&n_parts)->required(),
 		 "Number of particles")
-		("eps,e", po::value<double>(&pot_strength)->default_value(1.0),
-		 "Strength of interparticle potential")
+		("radius,a", po::value<double>(&radius)->required(),
+		 "Particle radius")
+		("eps", po::value<double>(&WCA_strength)->default_value(1.0),
+		 "Strength of WCA potential")
+		("alpha", po::value<double>(&alpha_ew)->required(),
+		 "Parameter of Ewald algorithm")
 		("dt,t", po::value<double>(&dt)->required(), "Timestep")
 		("iters,I", po::value<long>(&n_iters)->required(),
 		 "Number of time iterations")
@@ -38,6 +42,7 @@ Simul::Simul(int argc, char **argv) {
 		 po::value<std::string>(&output)->default_value("observables.h5"),
 		 "Name of the output file")
 		("test", po::bool_switch(&test), "Test mode")
+		("verbose,v", po::bool_switch(&verbose), "Verbose mode")
 		("help,h", "Print help message and exit")
 		;
 
@@ -63,7 +68,9 @@ Simul::Simul(int argc, char **argv) {
 	// Check if the values of the parameters are allowed
 	if (notStrPositive(len_x, "len_x") || notStrPositive(len_y, "len_y")
 		|| notStrPositive(n_parts, "n_parts")
-		|| notPositive(pot_strength, "eps")
+		|| notStrPositive(radius, "a")
+		|| notPositive(WCA_strength, "eps")
+		|| notStrPositive(alpha_ew, "alpha")
 		|| notStrPositive(dt, "dt")
 		|| notPositive(n_iters, "n_iters")) {
 		status = SIMUL_INIT_FAILED;
@@ -84,22 +91,27 @@ void Simul::run() {
 		          << std::endl;
 		return;
 	}
+	// Test of Ewald method
 	if (test) {
 		testEwald();
 		return;
 	}
 
 	// Initialize the state of the system
-	State state(len_x, len_y, n_parts, pot_strength, dt);
+	State state(len_x, len_y, n_parts, radius, WCA_strength, dt, alpha_ew);
 	/*Observables obs(len, n_parts, step_r, n_div_angle, less_obs,
 					cartesian);*/
 	
 	// Thermalization
 	for (long t = 0 ; t < n_iters_th ; ++t) {
+		if (verbose) 
+			std::cout << t << "\r";
 		state.evolve();
 	}
 	// Time evolution
 	for (long t = 0 ; t < n_iters ; ++t) {
+		if (verbose) 
+			std::cout << t << "\r";
 		state.evolve();
 		/*if (t % skip == 0) {
 			obs.compute(&state);
@@ -117,8 +129,9 @@ void Simul::run() {
 void Simul::print() const {
 	std::cout << "# ";
 	std::cout << "len_x=" << len_x << ", len_y=" << len_y << ", n_parts="
-			  << n_parts << ", pot_strength=" << pot_strength
-			  << ", dt=" << dt << ", n_iters=" << n_iters
-			  << ", n_iters_th=" << n_iters_th << ", skip=" << skip << "\n";
+			  << n_parts << ", radius=" << radius <<  ", WCA_strength="
+			  << WCA_strength << ", alpha=" << alpha_ew << ", dt=" << dt
+			  << ", n_iters=" << n_iters << ", n_iters_th=" << n_iters_th
+			  << ", skip=" << skip << "\n";
 	std::cout << std::endl;
 }

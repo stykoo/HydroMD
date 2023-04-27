@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <array>
+#include "ewald.h"
 
 #ifdef USE_MKL
 	#include "mkl.h"
@@ -24,8 +25,8 @@
 class State {
 	public:
 		//! Constructor of State
-		State(const double _len_x, const double _len_y, const long _n_parts,
-		      const double _pot_strength, const double _dt);
+		State(double _len_x, double _len_y, long _n_parts, double _a,
+		      double _pot_strength, double _dt, double _alpha_ew);
 		~State() {
 #ifdef USE_MKL
 			vslDeleteStream(&stream);
@@ -46,14 +47,17 @@ class State {
 
 
 	private:
-		void calcInternalForces(); //!< Compute internal forces
-		void calcInternalForceIJ_WCA(const long i, const long j);
+		void calcForces(); //!< Compute internal forces
+		void calcWCAForce(const long i, const long j);
 		void enforcePBC(); //!< Enforce periodic boundary conditions
 
 		const double len_x, len_y; //!< Length and width of the box
 		const long n_parts; //!< Number of particles
+		const double a; //!< Particle radius
 		const double pot_strength; //!< Strength of the interparticle potential
 		const double dt; //!< Timestep
+		const double alpha_ew; //!< Parameter of Ewald algorithm
+		Ewald ewald;
 
 #ifdef USE_MKL
 		VSLStreamStatePtr stream;

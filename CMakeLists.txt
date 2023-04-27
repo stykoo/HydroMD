@@ -4,15 +4,15 @@ PROJECT(HydroMD)
 
 set(EXECUTABLE_NAME "HydroMD")
 
-# Build in release mode by default
+# Build in debug mode by default
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+	set(CMAKE_BUILD_TYPE Debug)
 endif()
 set(EXECUTABLE_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
 
 set(CMAKE_CXX_FLAGS "-W -Wall")
-set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
-set(CMAKE_CXX_FLAGS_DEBUG "-Ofast -g -pg") # Profiling
+set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native")
+set(CMAKE_CXX_FLAGS_DEBUG "-Ofast -march=native -g -pg") # Profiling
 set(CMAKE_CXX_STANDARD 14)
 
 # Packages needed

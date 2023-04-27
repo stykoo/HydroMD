@@ -9,10 +9,11 @@
  *
  * Initializes the state of the system: particles randomly placed in a 2d box.
  */
-State::State(const double _len_x, const double _len_y, const long _n_parts,
-		      const double _pot_strength, const double _dt) :
-	len_x(_len_x), len_y(_len_y), n_parts(_n_parts),
-	pot_strength(_pot_strength), dt(_dt)
+State::State(double _len_x, double _len_y, long _n_parts, double _a,
+		     double _pot_strength, double _dt, double _alpha_ew) :
+	len_x(_len_x), len_y(_len_y), n_parts(_n_parts), a(_a),
+	pot_strength(_pot_strength), dt(_dt), alpha_ew(_alpha_ew),
+	ewald(_len_x, _len_y, _alpha_ew, _n_parts)
 #ifdef USE_MKL
 #else
 	, rng(std::chrono::system_clock::now().time_since_epoch().count())
@@ -50,10 +51,9 @@ State::State(const double _len_x, const double _len_y, const long _n_parts,
  * Evolve the system for one time step according to coupled Langevin equation.
  */
 void State::evolve() {
-	calcInternalForces();
+	calcForces();
 
 	for (long i = 0 ; i < n_parts ; ++i) {
-		// Internal forces
 		positions[0][i] += dt * forces[0][i];
 		positions[1][i] += dt * forces[1][i];
 	}
@@ -70,21 +70,25 @@ void State::dump() const {
 /*
  * \brief Compute the forces between the particles.
  */
-void State::calcInternalForces() {
+void State::calcForces() {
     for (long i = 0 ; i < n_parts ; ++i) {
 		forces[0][i] = 0;
 		forces[1][i] = 0;
     }
 
+	// Ewald
+	ewald.computeForces(positions[0], positions[1], forces[0], forces[1]);
+
+	// WCA
 	for (long i = 0 ; i < n_parts ; ++i) {
 		for (long j = 0 ; i < j ; ++i) {
-			calcInternalForceIJ_WCA(i, j);
+			calcWCAForce(i, j);
 		}
 	}
 }
 
 //! Compute internal force between particles i and j (WCA potential)
-void State::calcInternalForceIJ_WCA(const long i, const long j) {
+void State::calcWCAForce(const long i, const long j) {
 	//std::cout << i << " " << j << "\n";
 
 	double dx = positions[0][i] - positions[0][j];
@@ -92,7 +96,7 @@ void State::calcInternalForceIJ_WCA(const long i, const long j) {
 	// We want the periodized interval to be centered in 0
 	pbcSym(dx, len_x);
 	pbcSym(dy, len_y);
-	double dr2 = dx * dx + dy * dy;
+	double dr2 = (dx * dx + dy * dy) / (4 * a * a);
 
 	if(dr2 * (TWOONESIXTH - dr2) > 0.) {
 		double u = pot_strength;
