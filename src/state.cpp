@@ -12,7 +12,7 @@
 State::State(double _len_x, double _len_y, long _n_parts, double _a,
 		     double _pot_strength, double _dt, double _alpha_ew) :
 	len_x(_len_x), len_y(_len_y), n_parts(_n_parts), a(_a),
-	pot_strength(_pot_strength), dt(_dt), alpha_ew(_alpha_ew),
+	pot_strength(_pot_strength), dt(_dt),
 	ewald(_len_x, _len_y, _alpha_ew, _n_parts)
 #ifdef USE_MKL
 #else

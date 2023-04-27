@@ -13,6 +13,8 @@ class Ewald {
 	public:
 		Ewald(double _Lx, double _Ly, double _alpha, long _N,
 			  bool _verbose=false);
+		~Ewald();
+
 		static void computeForcesNaive(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y,
@@ -34,6 +36,8 @@ class Ewald {
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y);
 		void calcStructFac();
 		void enforcePBC(double &x, double &y);
+		void realForceNoImage(double dx, double dy, double dr2,
+				              double &fx, double &fy);
 		void realForce(double dx, double dy, double &fx, double &fy);
 
 		const double Lx, Ly; //!< Dimensions of the box
@@ -55,8 +59,8 @@ class Ewald {
 		double force_self_x, force_self_y; // Force of a particle on itself
 
 		std::vector<double> Sr, Si;
-		std::vector<double> sp, cc, ss;
-		//double *sp, *cc, *ss;
+		//std::vector<double> sp, cc, ss;
+		double *sp, *cc, *ss; // C-style array for MKL operations
 };
 
 int testEwald();

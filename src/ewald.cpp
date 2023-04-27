@@ -13,8 +13,8 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	// Initializations for real space
 	rRange2 = safety / alpha2;
 	double rRange = std::sqrt(rRange2);
-	hi_x = (long) std::ceil(rRange / Lx);
-	hi_y = (long) std::ceil(rRange / Ly);
+	hi_x = (long) std::floor(rRange / Lx + 0.5);
+	hi_y = (long) std::floor(rRange / Ly + 0.5);
 
 	// Initializations for Fourier space
 	double twopi = 2 * M_PI;
@@ -57,9 +57,19 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	// Structure factor (real and imaginary parts)
 	Sr.resize(nk);
 	Si.resize(nk);
-	sp.resize(N * nk); // scalar products G.R
+	/*sp.resize(N * nk); // scalar products G.R
 	cc.resize(N * nk); // cos(G.r)
-	ss.resize(N * nk); // sin(G.r)
+	ss.resize(N * nk); // sin(G.r)*/
+	// After profiling I realized this changes nothing
+#ifdef USE_MKL
+	sp = (double *) mkl_malloc(N * nk * sizeof(double), 512);
+	cc = (double *) mkl_malloc(N * nk * sizeof(double), 512);
+	ss = (double *) mkl_malloc(N * nk * sizeof(double), 512);
+#else
+	sp = (double *) malloc(N * nk * sizeof(double));
+	cc = (double *) malloc(N * nk * sizeof(double));
+	ss = (double *) malloc(N * nk * sizeof(double));
+#endif
 	
 
 	// Self interaction
@@ -83,6 +93,18 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 		}
 		std::cout << "\n";
 	}
+}
+
+Ewald::~Ewald() {
+#ifdef USE_MKL
+	mkl_free(sp);
+	mkl_free(cc);
+	mkl_free(ss);
+#else
+	free(sp);
+	free(cc);
+	free(ss);
+#endif
 }
 
 void Ewald::computeSelfInteraction() {
@@ -188,18 +210,15 @@ void Ewald::computeForces(
 void Ewald::addFourierForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
-	/*long Nall = N * nk; 
-	sp.resize(Nall); // scalar products G.R
-	cc.resize(Nall); // cos(G.r)
-	ss.resize(Nall); // sin(G.r)*/
 
 	calcScalarProd(pos_x, pos_y);
 
 	// Sin and cos
 #ifdef USE_MKL
-	vdSinCos(N * nk, sp.data(), ss.data(), cc.data());
+	//vdSinCos(N * nk, sp.data(), ss.data(), cc.data());
+	vdSinCos(N * nk, sp, ss, cc);
 #else
-	for (k = 0 ; k < N * nk ; ++k) {
+	for (long k = 0 ; k < N * nk ; ++k) {
 		cc[k] = std::cos(sp[k]);
 		ss[k] = std::sin(sp[k]);
 	}
@@ -256,14 +275,21 @@ void Ewald::calcStructFac() {
 void Ewald::addRealForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
-	double dx, dy, fx, fy;
+	double dx, dy, dr2, fx, fy;
 
 	for (long i = 0 ; i < N ; ++i) {
 		for (long j = 0 ; j < i ; ++j) {
 			dx = pos_x[i] - pos_x[j];
 			dy = pos_y[i] - pos_y[j];
 			enforcePBC(dx, dy);
-			realForce(dx, dy, fx, fy);
+			dr2 = dx * dx + dy * dy;
+			
+			if (dr2 < rRange2) {
+				if (hi_x == 0 && hi_y == 0)
+					realForceNoImage(dx, dy, dr2, fx, fy); // without images
+				else
+					realForce(dx, dy, fx, fy);
+			}
 			forces_x[i] += fx;
 			forces_y[i] += fy;
 			forces_x[j] += fx;
@@ -281,6 +307,24 @@ void Ewald::enforcePBC(double &x, double &y) {
 		y -= Ly;
 	else if (y < -Ly2)
 		y += Ly;
+}
+
+void Ewald::realForceNoImage(double dx, double dy, double dr2,
+		double &fx, double &fy) {
+	// No images, no check for range
+	double pref, px, py;
+	fx = 0.;
+	fy = 0.;
+
+	pref = std::exp(-alpha2 * dr2) / (2. * M_PI);
+	px = dx * dx / dr2;
+	py = dx * dy / dr2;
+	fx += pref * 2 * alpha2 * px;
+	fy += pref * 2 * alpha2 * py;
+	px = (2 * px - 1) / dr2;
+	py = 2 * py / dr2;
+	fx += pref * px;
+	fy += pref * py;
 }
 
 void Ewald::realForce(double dx, double dy, double &fx, double &fy) {

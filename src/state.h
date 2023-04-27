@@ -56,7 +56,6 @@ class State {
 		const double a; //!< Particle radius
 		const double pot_strength; //!< Strength of the interparticle potential
 		const double dt; //!< Timestep
-		const double alpha_ew; //!< Parameter of Ewald algorithm
 		Ewald ewald;
 
 #ifdef USE_MKL
