@@ -6,7 +6,7 @@
 
 Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	Lx(_Lx), Ly(_Ly), alpha(_alpha), N(_N), verbose(_verbose), 
-	Lx2(_Lx / 2.), Ly2(_Ly / 2), alpha2(_alpha * _alpha)
+	alpha2(_alpha * _alpha)
 {
 	double safety = -std::log(EWALD_ERROR);
 
@@ -55,17 +55,21 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	}
 	nk = fVecs_x.size();
 	// Structure factor (real and imaginary parts)
-	Sr.resize(nk);
+	/*Sr.resize(nk);
 	Si.resize(nk);
-	/*sp.resize(N * nk); // scalar products G.R
+	sp.resize(N * nk); // scalar products G.R
 	cc.resize(N * nk); // cos(G.r)
 	ss.resize(N * nk); // sin(G.r)*/
 	// After profiling I realized this changes nothing
 #ifdef USE_MKL
-	sp = (double *) mkl_malloc(N * nk * sizeof(double), 512);
-	cc = (double *) mkl_malloc(N * nk * sizeof(double), 512);
-	ss = (double *) mkl_malloc(N * nk * sizeof(double), 512);
+	Sr = (double *) mkl_malloc(nk * sizeof(double), ALIGN);
+	Si = (double *) mkl_malloc(nk * sizeof(double), ALIGN);
+	sp = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
+	cc = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
+	ss = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
 #else
+	Sr = (double *) malloc(nk * sizeof(double));
+	Si = (double *) malloc(nk * sizeof(double));
 	sp = (double *) malloc(N * nk * sizeof(double));
 	cc = (double *) malloc(N * nk * sizeof(double));
 	ss = (double *) malloc(N * nk * sizeof(double));
@@ -97,10 +101,14 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 
 Ewald::~Ewald() {
 #ifdef USE_MKL
+	mkl_free(Sr);
+	mkl_free(Si);
 	mkl_free(sp);
 	mkl_free(cc);
 	mkl_free(ss);
 #else
+	free(Sr);
+	free(Si);
 	free(sp);
 	free(cc);
 	free(ss);
@@ -228,14 +236,12 @@ void Ewald::addFourierForces(
 
 	// Forces
 	double z;
-	long k = 0;
 	for (long q = 0 ; q < nk ; ++q) {
 		for (long i = 0 ; i < N ; ++i) {
-			z = Sr[q] * cc[k] + Si[q] * ss[k];
+			z = Sr[q] * cc[N*q+i] + Si[q] * ss[N*q+i];
 			z -= 1.; // Exclude j = i term
 			forces_x[i] += z * fCoeffs_x[q];
 			forces_y[i] += z * fCoeffs_y[q];
-			++k;
 		}
 	}
 
@@ -248,27 +254,44 @@ void Ewald::addFourierForces(
 void Ewald::calcScalarProd(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y) {
 	// Scalar products
-	long k = 0;
 	for (long q = 0 ; q < nk ; ++q) {
 		for (long i = 0 ; i < N ; ++i) {
-			sp[k] = pos_x[i] * fVecs_x[q] + pos_y[i] * fVecs_y[q];
-			++k;
+			sp[N*q+i] = pos_x[i] * fVecs_x[q] + pos_y[i] * fVecs_y[q];
 		}
 	}
+/* Using BLAS leads to worse performance
+	for (long k = 0 ; k < N * nk ; ++k) {
+		sp[k] = 0;
+	}
+	cblas_dger(CblasRowMajor, nk, N, 1., fVecs_x.data(), 1, pos_x.data(), 1,
+			   sp, N);
+	cblas_dger(CblasRowMajor, nk, N, 1., fVecs_y.data(), 1, pos_y.data(), 1,
+			   sp, N);
+*/
 }
 
 void Ewald::calcStructFac() {
 	// Structure factor
-	long k = 0;
 	for (long q = 0 ; q < nk ; ++q) {
 		Sr[q] = 0.;
 		Si[q] = 0.;
+	}
+	for (long q = 0 ; q < nk ; ++q) {
+		for (long i = 0 ; i < N ; ++i) {
+			Sr[q] += cc[q*N+i];
+			Si[q] += ss[q*N+i];
+		}
+	}
+	// Try cblas_?gemv
+
+	/*long k = 0;
+	for (long q = 0 ; q < nk ; ++q) {
 		for (long i = 0 ; i < N ; ++i) {
 			Sr[q] += cc[k];
 			Si[q] += ss[k];
 			++k;
 		}
-	}
+	}*/
 }
 
 
@@ -299,14 +322,28 @@ void Ewald::addRealForces(
 }
 
 void Ewald::enforcePBC(double &x, double &y) {
-	if (x > Lx2)
+	// dirty but efficient when IEEE 754
+	double d;
+	int i;
+	d = x / Lx;
+	double2int(i, d, int);
+	x -= Lx * i;
+	d = y / Ly;
+	double2int(i, d, int);
+	y -= Ly * i;
+
+	/*if (x > Lx2)
 		x -= Lx;
 	else if (x < -Lx2)
 		x += Lx;
 	if (y > Ly2)
 		y -= Ly;
 	else if (y < -Ly2)
-		y += Ly;
+		y += Ly;*/
+	/*x -= Lx * ((int) x / Lx);
+	y -= Ly * ((int) y / Ly);*/
+	/*x -= Lx * std::round(x / Lx);
+	y -= Ly * std::round(y / Ly);*/
 }
 
 void Ewald::realForceNoImage(double dx, double dy, double dr2,

@@ -8,6 +8,7 @@
 #endif
 
 #define EWALD_ERROR 1e-7
+#define ALIGN 256
 
 class Ewald {
 	public:
@@ -44,7 +45,7 @@ class Ewald {
 		const double alpha; //!< Parameter of Ewald algorithm
 		const long N; //!< Number of particles
 		const bool verbose; //!< Verbose mode
-		const double Lx2, Ly2, alpha2;
+		const double alpha2;
 
 
 		double rRange2; //!< Maximal square distance between particles
@@ -58,11 +59,18 @@ class Ewald {
 
 		double force_self_x, force_self_y; // Force of a particle on itself
 
-		std::vector<double> Sr, Si;
+		//std::vector<double> Sr, Si;
 		//std::vector<double> sp, cc, ss;
+		double *Sr, *Si;
 		double *sp, *cc, *ss; // C-style array for MKL operations
 };
 
 int testEwald();
+
+// Trick to avoid round ASSUMING LITTLE ENDIAN
+union i_cast {double d; int i[2];};
+#define double2int(i, d, t)  \
+    {volatile union i_cast u; u.d = (d) + 6755399441055744.0; \
+    (i) = (t)u.i[0];}
 
 #endif // HYDROMD_EWALD_H_
