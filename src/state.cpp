@@ -89,20 +89,43 @@ void State::calcForces() {
 		forces[1][i] = 0;
     }
 
-	calcDists(); // Compute distances
+	// Compute distances
+	calcDists();
+
 	// Ewald
-	//ewald.computeForces(positions[0], positions[1], forces[0], forces[1]);
 	ewald.computeForces(positions[0], positions[1], dists[0], dists[1],
 			            forces[0], forces[1]);
 
 	// WCA
-	/*for (long i = 0 ; i < n_parts ; ++i) {
-		for (long j = 0 ; j < i ; ++j) {
-			calcWCAForce(i, j);
-		}
-	}*/
+	computeWCAForces();
 }
 
+void State::computeWCAForces() {
+	// Assuming distances are already computed
+	double dx, dy, dr2, fx, fy, u;
+	long k = 0;
+	for (long i = 0 ; i < n_parts ; ++i) {
+		for (long j = 0 ; j < i ; ++j) {
+			dx = dists[0][k];
+			dy = dists[1][k++];
+			dr2 = (dx * dx + dy * dy) / sigma2;
+
+			if(dr2 * (TWOONETHIRD - dr2) > 0.) {
+				u = WCA_strength / sigma2;
+				u *= (48. * pow(dr2, -7.) - 24.*pow(dr2, -4.)); 
+				fx = u * dx;
+				fy = u * dy;
+
+				forces[0][i] += fx;
+				forces[0][j] -= fx;
+				forces[1][i] += fy;
+				forces[1][j] -= fy;
+			}
+		}
+	}
+}
+
+/*
 //! Compute internal force between particles i and j (WCA potential)
 void State::calcWCAForce(const long i, const long j) {
 	double dx = positions[0][i] - positions[0][j];
@@ -124,6 +147,7 @@ void State::calcWCAForce(const long i, const long j) {
 		forces[1][j] -= fy;
 	}
 }
+*/
 
 // Used only for tests outside of the class
 void State::calcDists(const std::vector<double> &pos_x,

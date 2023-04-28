@@ -58,7 +58,8 @@ class State {
 	private:
 		void calcForces(); //!< Compute internal forces
 		void calcDists(); //!< Compute distances
-		void calcWCAForce(const long i, const long j);
+		void computeWCAForces(); //!< WCA repulsive forces
+		//void calcWCAForce(const long i, const long j);
 		void enforcePBC(); //!< Enforce periodic boundary conditions
 		void enforcePBC(double &x, double &y); //!< Same on specific numbers
 

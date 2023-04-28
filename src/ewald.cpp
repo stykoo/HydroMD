@@ -210,7 +210,6 @@ void Ewald::computeForces(
 	addRealForces(dists_x, dists_y, forces_x, forces_y);
 }
 
-
 void Ewald::addFourierForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
