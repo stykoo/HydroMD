@@ -1,8 +1,6 @@
 #include <iostream>
-#include <iomanip>
 #include <cmath>
 #include "ewald.h"
-
 
 Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	Lx(_Lx), Ly(_Ly), fac_x(1./_Lx), fac_y(1./_Ly), alpha(_alpha), N(_N),
@@ -56,8 +54,6 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	}
 	nk = fVecs_x.size();
 
-	dist_x.resize(N * (N - 1) / 2);
-	dist_y.resize(N * (N - 1) / 2);
 	ones.assign(2 * N, 1.);
 #ifdef USE_MKL
 	sp = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
@@ -197,7 +193,9 @@ void Ewald::computeForcesNaive(
 
 void Ewald::computeForces(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
+		const std::vector<double> &dists_x, const std::vector<double> &dists_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
+	// Provide distances for speed
 
 	// Self interaction
 	for (long i = 0 ; i < N ; ++i) {
@@ -209,8 +207,7 @@ void Ewald::computeForces(
 	addFourierForces(pos_x, pos_y, forces_x, forces_y);
 
 	// Real space contribution
-	calcDists(pos_x, pos_y);
-	addRealForces(forces_x, forces_y);
+	addRealForces(dists_x, dists_y, forces_x, forces_y);
 }
 
 
@@ -297,21 +294,16 @@ void Ewald::calcStructFac() {
 #endif
 }
 
-
 void Ewald::addRealForces(
+		const std::vector<double> &dists_x, const std::vector<double> &dists_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
 	double dx, dy, dr2, fx, fy;
 
-	/*for (long i = 0 ; i < N ; ++i) {
-		for (long j = 0 ; j < i ; ++j) {
-			dx = pos_x[i] - pos_x[j];
-			dy = pos_y[i] - pos_y[j];
-			enforcePBC(dx, dy);*/
 	long k = 0;
 	for (long i = 0 ; i < N ; ++i) {
 		for (long j = 0 ; j < i ; ++j) {
-			dx = dist_x[k];
-			dy = dist_y[k++];
+			dx = dists_x[k];
+			dy = dists_y[k++];
 			dr2 = dx * dx + dy * dy;
 			
 			if (dr2 < rRange2) {
@@ -324,50 +316,6 @@ void Ewald::addRealForces(
 				forces_x[j] += fx;
 				forces_y[j] += fy;
 			}
-		}
-	}
-}
-
-void Ewald::enforcePBC(double &x, double &y) {
-	// dirty but efficient when IEEE 754
-	volatile union i_cast u;
-	u.d = (fac_x * x) + 6755399441055744.0;
-	x -= Lx * ((int) u.i[0]);
-	u.d = (fac_y * y) + 6755399441055744.0;
-	y -= Ly * ((int) u.i[0]);
-
-	/*double d;
-	int i;
-	d = fac_x * x;
-	double2int(i, d, int);
-	x -= Lx * i;
-	d = fac_y * y;
-	double2int(i, d, int);
-	if (x > Lx2)
-		x -= Lx;
-	else if (x < -Lx2)
-		x += Lx;
-	if (y > Ly2)
-		y -= Ly;
-	else if (y < -Ly2)
-		y += Ly;
-	x -= Lx * ((int) x / Lx);
-	y -= Ly * ((int) y / Ly);
-	x -= Lx * std::round(x / Lx);
-	y -= Ly * std::round(y / Ly);*/
-}
-
-void Ewald::calcDists(const std::vector<double> &pos_x,
-		const std::vector<double> &pos_y) {
-	double dx, dy;
-	long k = 0;
-	for (long i = 0 ; i < N ; ++i) {
-		for (long j = 0 ; j < i ; ++j) {
-			dx = pos_x[i] - pos_x[j];
-			dy = pos_y[i] - pos_y[j];
-			enforcePBC(dx, dy);
-			dist_x[k] = dx;
-			dist_y[k++] = dy;
 		}
 	}
 }
@@ -389,13 +337,6 @@ void Ewald::realForceNoImage(double dx, double dy, double dr2,
 	fx += pref * px;
 	fy += pref * py;
 }
-
-/*void Ewald::WCAForce(double dx, double dy, double dr2rel,
-		double &fx, double &fy) {
-	double u = WCA_pref * (48. * pow(dr2rel, -7.) - 24.*pow(dr2rel, -4.)); 
-	fx += u * dx;
-	fy += u * dy;
-}*/
 
 void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
 	double dx0, dy0, dr2, pref, px, py;
@@ -421,50 +362,4 @@ void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
 			}
 		}
 	}
-}
-
-int testEwald() {
-	//double Lx = 1.5, Ly = 1.;
-	double Lx = 1., Ly = 1.;
-	std::vector<double> alphas = {1, 1.5, 2., 2.5, 3};
-
-	long N = 5;
-	/*std::vector<double> pos_x = {0.2, 0.4};
-	std::vector<double> pos_y = {0.3, 0.7};
-	std::vector<double> force_x(2, 0.), force_y(2, 0.);*/
-	/*std::vector<double> pos_x = {0.77354243, 0.2401132, 0.76776071};
-	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104};
-	std::vector<double> force_x(3, 0.), force_y(3, 0.);*/
-	std::vector<double> pos_x = {0.77354243, 0.2401132, 0.76776071, 0.27041645,
-		                         0.74654512};
-	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104, 0.83511414,
-		                         0.75500363};
-	std::vector<double> force_x0(N, 0.), force_y0(N, 0.);
-	std::vector<double> force_x(N, 0.), force_y(N, 0.);
-
-	Ewald::computeForcesNaive(pos_x, pos_y, force_x0, force_y0, Lx, Ly);
-	for (size_t i = 0 ; i < pos_x.size() ; ++i) {
-		std::cout << std::setprecision(10)
-			<< force_x0[i] << " " << force_y0[i] << "\n";
-	}
-
-	double max_err = 0., err;
-	for (double alpha : alphas) {
-		Ewald ew(Lx, Ly, alpha, N, false);
-		ew.computeForces(pos_x, pos_y, force_x, force_y);
-		for (size_t i = 0 ; i < pos_x.size() ; ++i) {
-			std::cout << std::setprecision(10)
-				<< force_x[i] << " " << force_y[i] << "\n";
-			err = std::abs(force_x[i] - force_x0[i]);
-			if (err > max_err)
-				max_err = err;
-			err = std::abs(force_y[i] - force_y0[i]);
-			if (err > max_err)
-				max_err = err;
-		}
-	}
-
-	std::cout << "Maximal error: " << max_err << "\n";
-
-	return 0;
 }

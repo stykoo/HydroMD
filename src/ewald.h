@@ -22,11 +22,15 @@ class Ewald {
 			double Lx, double Ly); 
 		void computeForces(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
+			const std::vector<double> &dists_x,
+			const std::vector<double> &dists_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y);
 
 	private:
 		void computeSelfInteraction();
 		void addRealForces(
+			const std::vector<double> &dists_x,
+			const std::vector<double> &dists_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y);
 		void addFourierForces(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
@@ -35,7 +39,6 @@ class Ewald {
 		void calcScalarProd(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y);
 		void calcStructFac();
-		void enforcePBC(double &x, double &y);
 		void calcDists(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y);
 		void realForceNoImage(double dx, double dy, double dr2,
@@ -62,19 +65,8 @@ class Ewald {
 
 		double force_self_x, force_self_y; // Force of a particle on itself
 
-		//std::vector<double> Sr, Si;
-		//std::vector<double> sp, cc, ss;
-		std::vector<double> dist_x, dist_y;
 		std::vector<double> ones;
 		double *sp, *Sr, *Si, *cc, *ss; // C-style array for MKL operations
 };
-
-int testEwald();
-
-// Trick to avoid round ASSUMING LITTLE ENDIAN
-union i_cast {double d; int i[2];};
-#define double2int(i, d, t)  \
-    {volatile union i_cast u; u.d = (d) + 6755399441055744.0; \
-    (i) = (t)u.i[0];}
 
 #endif // HYDROMD_EWALD_H_

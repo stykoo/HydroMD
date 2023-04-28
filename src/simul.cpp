@@ -1,5 +1,6 @@
 #include <fstream>
 #include <exception>
+#include <iomanip>
 #include <boost/program_options.hpp>
 #include "simul.h"
 #include "ewald.h"
@@ -142,4 +143,53 @@ void Simul::print(std::ostream &stream) const {
 			  << ", n_iters=" << n_iters << ", n_iters_th=" << n_iters_th
 			  << ", skip=" << skip << "\n";
 	stream << std::endl;
+}
+
+int testEwald() {
+	//double Lx = 1.5, Ly = 1.;
+	double Lx = 1., Ly = 1.;
+	std::vector<double> alphas = {1, 1.5, 2., 2.5, 3};
+
+	long N = 5;
+	/*std::vector<double> pos_x = {0.2, 0.4};
+	std::vector<double> pos_y = {0.3, 0.7};
+	std::vector<double> force_x(2, 0.), force_y(2, 0.);*/
+	/*std::vector<double> pos_x = {0.77354243, 0.2401132, 0.76776071};
+	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104};
+	std::vector<double> force_x(3, 0.), force_y(3, 0.);*/
+	std::vector<double> pos_x = {0.77354243, 0.2401132, 0.76776071, 0.27041645,
+		                         0.74654512};
+	std::vector<double> pos_y = {0.09785807, 0.9736114, 0.23561104, 0.83511414,
+		                         0.75500363};
+	std::vector<double> force_x0(N, 0.), force_y0(N, 0.);
+	std::vector<double> force_x(N, 0.), force_y(N, 0.);
+	std::vector<double> dists_x, dists_y;
+
+	State::calcDists(pos_x, pos_y, dists_x, dists_y, Lx, Ly);
+
+	Ewald::computeForcesNaive(pos_x, pos_y, force_x0, force_y0, Lx, Ly);
+	for (size_t i = 0 ; i < pos_x.size() ; ++i) {
+		std::cout << std::setprecision(10)
+			<< force_x0[i] << " " << force_y0[i] << "\n";
+	}
+
+	double max_err = 0., err;
+	for (double alpha : alphas) {
+		Ewald ew(Lx, Ly, alpha, N, false);
+		ew.computeForces(pos_x, pos_y, dists_x, dists_y, force_x, force_y);
+		for (size_t i = 0 ; i < pos_x.size() ; ++i) {
+			std::cout << std::setprecision(10)
+				<< force_x[i] << " " << force_y[i] << "\n";
+			err = std::abs(force_x[i] - force_x0[i]);
+			if (err > max_err)
+				max_err = err;
+			err = std::abs(force_y[i] - force_y0[i]);
+			if (err > max_err)
+				max_err = err;
+		}
+	}
+
+	std::cout << "Maximal error: " << max_err << "\n";
+
+	return 0;
 }

@@ -48,13 +48,22 @@ class State {
 
 		void dump() const; //!< Dump the positions
 		void writePos(std::ostream &stream) const;
+		//! For use outside of the class
+		static void calcDists(const std::vector<double> &pos_x,
+				const std::vector<double> &pos_y,
+				std::vector<double> &dists_x, std::vector<double> &dists_y,
+				double Lx, double Ly);
+
 
 	private:
 		void calcForces(); //!< Compute internal forces
+		void calcDists(); //!< Compute distances
 		void calcWCAForce(const long i, const long j);
 		void enforcePBC(); //!< Enforce periodic boundary conditions
+		void enforcePBC(double &x, double &y); //!< Same on specific numbers
 
-		const double len_x, len_y; //!< Length and width of the box
+		const double Lx, Ly; //!< Length and width of the box
+		const double fac_x, fac_y; //!< Inverse length and width of the box
 		const long n_parts; //!< Number of particles
 		const double sigma2; //!< Square of particle diameter
 		const double WCA_strength; //!< Strength of the WCA potential
@@ -71,29 +80,21 @@ class State {
 		//! Positions of the particles
 		std::array<std::vector<double>, 2> positions;
 		std::array<std::vector<double>, 2> forces;  //!< Internal forces
+		std::array<std::vector<double>, 2> dists;
 };
 
-/*! 
- * \brief Periodic boundary conditions on a segment
- * 
- * Update x to be between 0 and L.
- *
- * \param x Value
- * \param L Length of the box
- */
+// Trick to avoid round ASSUMING LITTLE ENDIAN
+union i_cast {double d; int i[2];};
+#define double2int(i, d, t)  \
+    {volatile union i_cast u; u.d = (d) + 6755399441055744.0; \
+    (i) = (t)u.i[0];}
+
+
 template<typename T>
 void pbc(T &x, const T L) {
 	x -= L * std::floor(x / L);
 }
 
-/*! 
- * \brief Periodic boundary conditions on a segment (symmetric)
- * 
- * Update x to be between -L/2 and L/2.
- *
- * \param x Value
- * \param L Length of the box
- */
 template<typename T>
 inline void pbcSym(T &x, const T L) {
 	x -= L * std::round(x / L);

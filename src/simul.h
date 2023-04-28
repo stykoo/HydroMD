@@ -85,4 +85,6 @@ bool notStrPositive(const T &a, std::string name) {
 	return false;
 }
 
+int testEwald();
+
 #endif // HYDROMD_SIMUL_H_
