@@ -21,7 +21,7 @@ class Simul {
 	public:
 		Simul(int argc, char **argv); //!< Constructor from arguments
 		void run(); //!< Run the simulation
-		void print() const; //!< Print the parameters
+		void print(std::ostream &stream) const; //!< Print the parameters
 
 		//! Get initialization status
 		SimulInitStatus getStatus() const { return status; }
@@ -38,6 +38,7 @@ class Simul {
 		long n_iters_th; //!< Number of time iterations of thermalization
 		long skip; //!< Iterations between two computation of observables
 		std::string output; //!< Name of the output file
+		bool export_pos; //!< Export positions
 		bool test; //!< Test mode
 		bool verbose; //!< Verbose mode
 

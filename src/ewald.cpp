@@ -375,6 +375,13 @@ void Ewald::realForceNoImage(double dx, double dy, double dr2,
 	fy += pref * py;
 }
 
+/*void Ewald::WCAForce(double dx, double dy, double dr2rel,
+		double &fx, double &fy) {
+	double u = WCA_pref * (48. * pow(dr2rel, -7.) - 24.*pow(dr2rel, -4.)); 
+	fx += u * dx;
+	fy += u * dy;
+}*/
+
 void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
 	double dx0, dy0, dr2, pref, px, py;
 	fx = 0.;

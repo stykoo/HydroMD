@@ -1,6 +1,6 @@
+#include <fstream>
 #include <exception>
 #include <boost/program_options.hpp>
-// #include "observables.h"
 #include "simul.h"
 #include "ewald.h"
 #include "state.h"
@@ -39,8 +39,9 @@ Simul::Simul(int argc, char **argv) {
 		("skip,S", po::value<long>(&skip)->default_value(100),
 		 "Iterations between two computations of observables")
 		("output,O",
-		 po::value<std::string>(&output)->default_value("observables.h5"),
+		 po::value<std::string>(&output)->default_value("observables"),
 		 "Name of the output file")
+		("pos", po::bool_switch(&export_pos), "Export positions")
 		("test", po::bool_switch(&test), "Test mode")
 		("verbose,v", po::bool_switch(&verbose), "Verbose mode")
 		("help,h", "Print help message and exit")
@@ -99,8 +100,6 @@ void Simul::run() {
 
 	// Initialize the state of the system
 	State state(len_x, len_y, n_parts, radius, WCA_strength, dt, alpha_ew);
-	/*Observables obs(len, n_parts, step_r, n_div_angle, less_obs,
-					cartesian);*/
 	
 	// Thermalization
 	for (long t = 0 ; t < n_iters_th ; ++t) {
@@ -108,30 +107,39 @@ void Simul::run() {
 			std::cout << t << "\r";
 		state.evolve();
 	}
+
+	std::ofstream ofile;
+	if (export_pos) {
+		ofile.open(output + "_pos.dat");
+		print(ofile);
+		state.writePos(ofile);
+	}
+
 	// Time evolution
 	for (long t = 0 ; t < n_iters ; ++t) {
 		if (verbose) 
 			std::cout << t << "\r";
 		state.evolve();
-		/*if (t % skip == 0) {
-			obs.compute(&state);
-		}*/
+		if (t % skip == 0) {
+			if (export_pos) {
+				state.writePos(ofile);
+			}
+		}
 	}
-
-	/*obs.writeH5(output, rho, n_parts, pot_strength, temperature, rot_dif,
-				activity, dt, n_iters, n_iters_th, skip);*/
-	//state.dump();
+	if (export_pos) {
+		ofile.close();
+	}
 }
 
 /*!
  * \brief Print the parameters of the simulation
  */
-void Simul::print() const {
-	std::cout << "# ";
-	std::cout << "len_x=" << len_x << ", len_y=" << len_y << ", n_parts="
+void Simul::print(std::ostream &stream) const {
+	stream << "# ";
+	stream << "len_x=" << len_x << ", len_y=" << len_y << ", n_parts="
 			  << n_parts << ", radius=" << radius <<  ", WCA_strength="
 			  << WCA_strength << ", alpha=" << alpha_ew << ", dt=" << dt
 			  << ", n_iters=" << n_iters << ", n_iters_th=" << n_iters_th
 			  << ", skip=" << skip << "\n";
-	std::cout << std::endl;
+	stream << std::endl;
 }

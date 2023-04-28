@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	simulation.print();
+	simulation.print(std::cout);
 	simulation.run();
 
 	return 0;

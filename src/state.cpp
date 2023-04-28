@@ -10,9 +10,9 @@
  * Initializes the state of the system: particles randomly placed in a 2d box.
  */
 State::State(double _len_x, double _len_y, long _n_parts, double _a,
-		     double _pot_strength, double _dt, double _alpha_ew) :
-	len_x(_len_x), len_y(_len_y), n_parts(_n_parts), a(_a),
-	pot_strength(_pot_strength), dt(_dt),
+		     double _WCA_strength, double _dt, double _alpha_ew) :
+	len_x(_len_x), len_y(_len_y), n_parts(_n_parts), sigma2(4 * _a * _a),
+	WCA_strength(_WCA_strength), dt(_dt),
 	ewald(_len_x, _len_y, _alpha_ew, _n_parts)
 #ifdef USE_MKL
 #else
@@ -67,6 +67,16 @@ void State::dump() const {
 	}
 }
 
+void State::writePos(std::ostream &stream) const {
+	for (long i = 0 ; i < n_parts ; ++i) {
+		stream << positions[0][i] << " ";
+	}
+	for (long i = 0 ; i < n_parts ; ++i) {
+		stream << positions[1][i] << " ";
+	}
+	stream << "\n";
+}
+
 /*
  * \brief Compute the forces between the particles.
  */
@@ -81,7 +91,7 @@ void State::calcForces() {
 
 	// WCA
 	for (long i = 0 ; i < n_parts ; ++i) {
-		for (long j = 0 ; i < j ; ++i) {
+		for (long j = 0 ; j < i ; ++j) {
 			calcWCAForce(i, j);
 		}
 	}
@@ -89,17 +99,15 @@ void State::calcForces() {
 
 //! Compute internal force between particles i and j (WCA potential)
 void State::calcWCAForce(const long i, const long j) {
-	//std::cout << i << " " << j << "\n";
-
 	double dx = positions[0][i] - positions[0][j];
 	double dy = positions[1][i] - positions[1][j];
 	// We want the periodized interval to be centered in 0
 	pbcSym(dx, len_x);
 	pbcSym(dy, len_y);
-	double dr2 = (dx * dx + dy * dy) / (4 * a * a);
+	double dr2 = (dx * dx + dy * dy) / sigma2;
 
-	if(dr2 * (TWOONESIXTH - dr2) > 0.) {
-		double u = pot_strength;
+	if(dr2 * (TWOONETHIRD - dr2) > 0.) {
+		double u = WCA_strength / sigma2;
 		u *= (48. * pow(dr2, -7.) - 24.*pow(dr2, -4.)); 
 		double fx = u * dx;
 		double fy = u * dy;
