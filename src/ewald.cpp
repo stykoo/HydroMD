@@ -312,11 +312,11 @@ void Ewald::addRealForces(
 					realForceNoImage(dx, dy, dr2, fx, fy); // without images
 				else
 					realForce(dx, dy, fx, fy);
+				forces_x[i] += fx;
+				forces_y[i] += fy;
+				forces_x[j] += fx;
+				forces_y[j] += fy;
 			}
-			forces_x[i] += fx;
-			forces_y[i] += fy;
-			forces_x[j] += fx;
-			forces_y[j] += fy;
 		}
 	}
 }
