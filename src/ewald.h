@@ -27,7 +27,6 @@ class Ewald {
 	private:
 		void computeSelfInteraction();
 		void addRealForces(
-			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y);
 		void addFourierForces(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
@@ -37,6 +36,8 @@ class Ewald {
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y);
 		void calcStructFac();
 		void enforcePBC(double &x, double &y);
+		void calcDists(
+			const std::vector<double> &pos_x, const std::vector<double> &pos_y);
 		void realForceNoImage(double dx, double dy, double dr2,
 				              double &fx, double &fy);
 		void realForce(double dx, double dy, double &fx, double &fy);
@@ -63,6 +64,7 @@ class Ewald {
 
 		//std::vector<double> Sr, Si;
 		//std::vector<double> sp, cc, ss;
+		std::vector<double> dist_x, dist_y;
 		std::vector<double> ones;
 		double *sp, *Sr, *Si, *cc, *ss; // C-style array for MKL operations
 };

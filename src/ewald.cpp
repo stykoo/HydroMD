@@ -55,12 +55,9 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 		}
 	}
 	nk = fVecs_x.size();
-	// Structure factor (real and imaginary parts)
-	/*Sr.resize(nk);
-	Si.resize(nk);
-	sp.resize(N * nk); // scalar products G.R
-	cc.resize(N * nk); // cos(G.r)
-	ss.resize(N * nk); // sin(G.r)*/
+
+	dist_x.resize(N * (N - 1) / 2);
+	dist_y.resize(N * (N - 1) / 2);
 	ones.assign(2 * N, 1.);
 #ifdef USE_MKL
 	sp = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
@@ -212,7 +209,8 @@ void Ewald::computeForces(
 	addFourierForces(pos_x, pos_y, forces_x, forces_y);
 
 	// Real space contribution
-	addRealForces(pos_x, pos_y, forces_x, forces_y);
+	calcDists(pos_x, pos_y);
+	addRealForces(forces_x, forces_y);
 }
 
 
@@ -301,15 +299,19 @@ void Ewald::calcStructFac() {
 
 
 void Ewald::addRealForces(
-		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y) {
 	double dx, dy, dr2, fx, fy;
 
-	for (long i = 0 ; i < N ; ++i) {
+	/*for (long i = 0 ; i < N ; ++i) {
 		for (long j = 0 ; j < i ; ++j) {
 			dx = pos_x[i] - pos_x[j];
 			dy = pos_y[i] - pos_y[j];
-			enforcePBC(dx, dy);
+			enforcePBC(dx, dy);*/
+	long k = 0;
+	for (long i = 0 ; i < N ; ++i) {
+		for (long j = 0 ; j < i ; ++j) {
+			dx = dist_x[k];
+			dy = dist_y[k++];
 			dr2 = dx * dx + dy * dy;
 			
 			if (dr2 < rRange2) {
@@ -341,20 +343,33 @@ void Ewald::enforcePBC(double &x, double &y) {
 	x -= Lx * i;
 	d = fac_y * y;
 	double2int(i, d, int);
-	y -= Ly * i;*/
-
-	/*if (x > Lx2)
+	if (x > Lx2)
 		x -= Lx;
 	else if (x < -Lx2)
 		x += Lx;
 	if (y > Ly2)
 		y -= Ly;
 	else if (y < -Ly2)
-		y += Ly;*/
-	/*x -= Lx * ((int) x / Lx);
-	y -= Ly * ((int) y / Ly);*/
-	/*x -= Lx * std::round(x / Lx);
+		y += Ly;
+	x -= Lx * ((int) x / Lx);
+	y -= Ly * ((int) y / Ly);
+	x -= Lx * std::round(x / Lx);
 	y -= Ly * std::round(y / Ly);*/
+}
+
+void Ewald::calcDists(const std::vector<double> &pos_x,
+		const std::vector<double> &pos_y) {
+	double dx, dy;
+	long k = 0;
+	for (long i = 0 ; i < N ; ++i) {
+		for (long j = 0 ; j < i ; ++j) {
+			dx = pos_x[i] - pos_x[j];
+			dy = pos_y[i] - pos_y[j];
+			enforcePBC(dx, dy);
+			dist_x[k] = dx;
+			dist_y[k++] = dy;
+		}
+	}
 }
 
 void Ewald::realForceNoImage(double dx, double dy, double dr2,
