@@ -5,8 +5,8 @@
 
 
 Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
-	Lx(_Lx), Ly(_Ly), alpha(_alpha), N(_N), verbose(_verbose), 
-	alpha2(_alpha * _alpha)
+	Lx(_Lx), Ly(_Ly), fac_x(1./_Lx), fac_y(1./_Ly), alpha(_alpha), N(_N),
+	verbose(_verbose), alpha2(_alpha * _alpha)
 {
 	double safety = -std::log(EWALD_ERROR);
 
@@ -15,6 +15,7 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	double rRange = std::sqrt(rRange2);
 	hi_x = (long) std::floor(rRange / Lx + 0.5);
 	hi_y = (long) std::floor(rRange / Ly + 0.5);
+	no_image =  (hi_x == 0 && hi_y == 0);
 
 	// Initializations for Fourier space
 	double twopi = 2 * M_PI;
@@ -61,6 +62,7 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	cc.resize(N * nk); // cos(G.r)
 	ss.resize(N * nk); // sin(G.r)*/
 	// After profiling I realized this changes nothing
+	ones.assign(N, 1.);
 #ifdef USE_MKL
 	Sr = (double *) mkl_malloc(nk * sizeof(double), ALIGN);
 	Si = (double *) mkl_malloc(nk * sizeof(double), ALIGN);
@@ -272,7 +274,7 @@ void Ewald::calcScalarProd(
 
 void Ewald::calcStructFac() {
 	// Structure factor
-	for (long q = 0 ; q < nk ; ++q) {
+	/*for (long q = 0 ; q < nk ; ++q) {
 		Sr[q] = 0.;
 		Si[q] = 0.;
 	}
@@ -281,17 +283,12 @@ void Ewald::calcStructFac() {
 			Sr[q] += cc[q*N+i];
 			Si[q] += ss[q*N+i];
 		}
-	}
-	// Try cblas_?gemv
-
-	/*long k = 0;
-	for (long q = 0 ; q < nk ; ++q) {
-		for (long i = 0 ; i < N ; ++i) {
-			Sr[q] += cc[k];
-			Si[q] += ss[k];
-			++k;
-		}
 	}*/
+	// Try cblas_?gemv
+	cblas_dgemv(CblasRowMajor, CblasNoTrans, nk, N, 1., cc, N,
+		        ones.data(), 1, 0., Sr, 1);
+	cblas_dgemv(CblasRowMajor, CblasNoTrans, nk, N, 1., ss, N,
+		        ones.data(), 1, 0., Si, 1);
 }
 
 
@@ -308,7 +305,7 @@ void Ewald::addRealForces(
 			dr2 = dx * dx + dy * dy;
 			
 			if (dr2 < rRange2) {
-				if (hi_x == 0 && hi_y == 0)
+				if (no_image)
 					realForceNoImage(dx, dy, dr2, fx, fy); // without images
 				else
 					realForce(dx, dy, fx, fy);
@@ -323,14 +320,20 @@ void Ewald::addRealForces(
 
 void Ewald::enforcePBC(double &x, double &y) {
 	// dirty but efficient when IEEE 754
-	double d;
+	volatile union i_cast u;
+	u.d = (fac_x * x) + 6755399441055744.0;
+	x -= Lx * ((int) u.i[0]);
+	u.d = (fac_y * y) + 6755399441055744.0;
+	y -= Ly * ((int) u.i[0]);
+
+	/*double d;
 	int i;
-	d = x / Lx;
+	d = fac_x * x;
 	double2int(i, d, int);
 	x -= Lx * i;
-	d = y / Ly;
+	d = fac_y * y;
 	double2int(i, d, int);
-	y -= Ly * i;
+	y -= Ly * i;*/
 
 	/*if (x > Lx2)
 		x -= Lx;

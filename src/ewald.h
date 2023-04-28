@@ -42,6 +42,7 @@ class Ewald {
 		void realForce(double dx, double dy, double &fx, double &fy);
 
 		const double Lx, Ly; //!< Dimensions of the box
+		const double fac_x, fac_y; //!< Inverse dimensions of the box
 		const double alpha; //!< Parameter of Ewald algorithm
 		const long N; //!< Number of particles
 		const bool verbose; //!< Verbose mode
@@ -50,6 +51,7 @@ class Ewald {
 
 		double rRange2; //!< Maximal square distance between particles
 		long hi_x, hi_y; //!< Maximal images in x/y direction
+		bool no_image; //!< Don't need images
 
 		double fForceAvg_x; //!< Constant contribution
 		std::vector<double> fVecs_x, fVecs_y; //!< Reciprocal space vectors G
@@ -61,6 +63,7 @@ class Ewald {
 
 		//std::vector<double> Sr, Si;
 		//std::vector<double> sp, cc, ss;
+		std::vector<double> ones;
 		double *Sr, *Si;
 		double *sp, *cc, *ss; // C-style array for MKL operations
 };
