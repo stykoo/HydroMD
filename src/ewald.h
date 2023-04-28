@@ -64,8 +64,7 @@ class Ewald {
 		//std::vector<double> Sr, Si;
 		//std::vector<double> sp, cc, ss;
 		std::vector<double> ones;
-		double *Sr, *Si;
-		double *sp, *cc, *ss; // C-style array for MKL operations
+		double *sp, *Sr, *Si, *cc, *ss; // C-style array for MKL operations
 };
 
 int testEwald();

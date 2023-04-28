@@ -61,14 +61,13 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 	sp.resize(N * nk); // scalar products G.R
 	cc.resize(N * nk); // cos(G.r)
 	ss.resize(N * nk); // sin(G.r)*/
-	// After profiling I realized this changes nothing
-	ones.assign(N, 1.);
+	ones.assign(2 * N, 1.);
 #ifdef USE_MKL
-	Sr = (double *) mkl_malloc(nk * sizeof(double), ALIGN);
-	Si = (double *) mkl_malloc(nk * sizeof(double), ALIGN);
 	sp = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
-	cc = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
-	ss = (double *) mkl_malloc(N * nk * sizeof(double), ALIGN);
+	Sr = (double *) mkl_malloc(2 * nk * sizeof(double), ALIGN);
+	Si = &Sr[nk]; // Both arrays are one after the other
+	cc = (double *) mkl_malloc(2 * N * nk * sizeof(double), ALIGN);
+	ss = &cc[N * nk]; // Both arrays are one after the other
 #else
 	Sr = (double *) malloc(nk * sizeof(double));
 	Si = (double *) malloc(nk * sizeof(double));
@@ -104,10 +103,10 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
 Ewald::~Ewald() {
 #ifdef USE_MKL
 	mkl_free(Sr);
-	mkl_free(Si);
+	//mkl_free(Si);
 	mkl_free(sp);
 	mkl_free(cc);
-	mkl_free(ss);
+	//mkl_free(ss);
 #else
 	free(Sr);
 	free(Si);
@@ -240,12 +239,20 @@ void Ewald::addFourierForces(
 	double z;
 	for (long q = 0 ; q < nk ; ++q) {
 		for (long i = 0 ; i < N ; ++i) {
-			z = Sr[q] * cc[N*q+i] + Si[q] * ss[N*q+i];
-			z -= 1.; // Exclude j = i term
+			z = (Sr[q] * cc[N*q+i]) + (Si[q] * ss[N*q+i]) - 1.; // Exclude j=i
 			forces_x[i] += z * fCoeffs_x[q];
 			forces_y[i] += z * fCoeffs_y[q];
 		}
 	}
+	/*for (long q = 0 ; q < nk ; ++q) {
+		for (long i = 0 ; i < N ; ++i) {
+			sp[N*q+i] = (Sr[q] * cc[N*q+i]) + (Si[q] * ss[N*q+i]) - 1.;
+		}
+	}
+	cblas_dgemv(CblasRowMajor, CblasTrans, nk, N, 1., sp, N,
+		        fCoeffs_x.data(), 1, 1., forces_x.data(), 1);
+	cblas_dgemv(CblasRowMajor, CblasTrans, nk, N, 1., sp, N,
+		        fCoeffs_y.data(), 1, 1., forces_y.data(), 1);*/
 
 	// Constant contribution
 	for (long i = 0 ; i < N ; ++i) {
@@ -261,20 +268,25 @@ void Ewald::calcScalarProd(
 			sp[N*q+i] = pos_x[i] * fVecs_x[q] + pos_y[i] * fVecs_y[q];
 		}
 	}
-/* Using BLAS leads to worse performance
-	for (long k = 0 ; k < N * nk ; ++k) {
+	/* for (long k = 0 ; k < N * nk ; ++k) {
 		sp[k] = 0;
 	}
 	cblas_dger(CblasRowMajor, nk, N, 1., fVecs_x.data(), 1, pos_x.data(), 1,
 			   sp, N);
 	cblas_dger(CblasRowMajor, nk, N, 1., fVecs_y.data(), 1, pos_y.data(), 1,
-			   sp, N);
-*/
+			   sp, N); */
 }
 
 void Ewald::calcStructFac() {
 	// Structure factor
-	/*for (long q = 0 ; q < nk ; ++q) {
+#if USE_MKL
+	// We process both cc/ss and Sr/Si in one go
+	cblas_dgemv(CblasRowMajor, CblasNoTrans, 2*nk, N, 1., cc, N,
+		        ones.data(), 1, 0., Sr, 1);
+	//cblas_dgemv(CblasRowMajor, CblasNoTrans, nk, N, 1., ss, N,
+	//            ones.data(), 1, 0., Si, 1);
+#else
+	for (long q = 0 ; q < nk ; ++q) {
 		Sr[q] = 0.;
 		Si[q] = 0.;
 	}
@@ -283,12 +295,8 @@ void Ewald::calcStructFac() {
 			Sr[q] += cc[q*N+i];
 			Si[q] += ss[q*N+i];
 		}
-	}*/
-	// Try cblas_?gemv
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, nk, N, 1., cc, N,
-		        ones.data(), 1, 0., Sr, 1);
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, nk, N, 1., ss, N,
-		        ones.data(), 1, 0., Si, 1);
+	}
+#endif
 }
 
 
