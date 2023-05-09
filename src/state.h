@@ -17,6 +17,9 @@
 // #define TWOONESIXTH 1.12246204830937298143 
 // 2(1/3)
 #define TWOONETHIRD 1.25992104989487316477
+#define HARMONIC_STRENGTH 100
+#define HARMONIC_FAC 0.9
+#define MAX_RELAX_STEPS 20000
 
 
 /*!
@@ -29,7 +32,8 @@ class State {
 	public:
 		//! Constructor of State
 		State(double _len_x, double _len_y, long _n_parts, double _a,
-		      double _WCA_strength, double _dt, double _alpha_ew);
+		      double _hydro_strength, double _WCA_strength,
+			  double _mag_strength, double _dt, double _alpha_ew);
 		~State() {
 #ifdef USE_MKL
 			vslDeleteStream(&stream);
@@ -56,18 +60,22 @@ class State {
 
 
 	private:
+		void relax(); //!< Relax the initial system
 		void calcForces(); //!< Compute internal forces
 		void calcDists(); //!< Compute distances
+		void computeHarmonicForces(); //!< Harmonic repulsive forces
 		void computeWCAForces(); //!< WCA repulsive forces
-		//void calcWCAForce(const long i, const long j);
+		void computeMagneticForces(); //!< Magnetic forces
 		void enforcePBC(); //!< Enforce periodic boundary conditions
 		void enforcePBC(double &x, double &y); //!< Same on specific numbers
+		double minDistSq() const;
 
 		const double Lx, Ly; //!< Length and width of the box
 		const double fac_x, fac_y; //!< Inverse length and width of the box
 		const long n_parts; //!< Number of particles
 		const double sigma2; //!< Square of particle diameter
 		const double WCA_strength; //!< Strength of the WCA potential
+		const double mag_strength; //!< Strength of the magnetic interaction
 		const double dt; //!< Timestep
 		Ewald ewald;
 

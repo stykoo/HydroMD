@@ -10,11 +10,12 @@
  * Initializes the state of the system: particles randomly placed in a 2d box.
  */
 State::State(double _len_x, double _len_y, long _n_parts, double _a,
-		     double _WCA_strength, double _dt, double _alpha_ew) :
+		     double _hydro_strength, double _WCA_strength,
+			 double _mag_strength, double _dt, double _alpha_ew) :
 	Lx(_len_x), Ly(_len_y), fac_x(1. / _len_x), fac_y(1. / _len_y),
-	n_parts(_n_parts), sigma2(4 * _a * _a),
-	WCA_strength(_WCA_strength), dt(_dt),
-	ewald(_len_x, _len_y, _alpha_ew, _n_parts)
+	n_parts(_n_parts), sigma2(4 * _a * _a / TWOONETHIRD),
+	WCA_strength(_WCA_strength), mag_strength(_mag_strength), dt(_dt),
+	ewald(_len_x, _len_y, _alpha_ew, _hydro_strength, _n_parts)
 #ifdef USE_MKL
 #else
 	, rng(std::chrono::system_clock::now().time_since_epoch().count())
@@ -42,10 +43,36 @@ State::State(double _len_x, double _len_y, long _n_parts, double _a,
 	for (long i = 0 ; i < n_parts ; ++i) {
 		positions[0][i] = Lx * rnd(rng);
 		positions[1][i] = Ly * rnd(rng);
-		forces[0][i] = 0;
-		forces[1][i] = 0;
 	}
 #endif
+	relax(); // Separate particles from one another
+}
+
+
+void State::relax() {
+    for (long i = 0 ; i < n_parts ; ++i) {
+		forces[0][i] = 0;
+		forces[1][i] = 0;
+    }
+	calcDists();
+	double minDist2 = minDistSq();
+
+	long n = 0;
+	while (minDist2 < HARMONIC_FAC * TWOONETHIRD * sigma2
+		   && n < MAX_RELAX_STEPS) {
+		computeHarmonicForces();
+		for (long i = 0 ; i < n_parts ; ++i) {
+			positions[0][i] += dt * forces[0][i];
+			positions[1][i] += dt * forces[1][i];
+			forces[0][i] = 0;
+			forces[1][i] = 0;
+		}
+		enforcePBC();
+		calcDists();
+		minDist2 = minDistSq();
+		++n;
+	}
+	std::cout << "Min dist: " << sqrt(minDist2) << " (" << n << " iters)\n";
 }
 
 /*!
@@ -98,6 +125,33 @@ void State::calcForces() {
 
 	// WCA
 	computeWCAForces();
+
+	// Magnetic
+	computeMagneticForces();
+}
+
+void State::computeHarmonicForces() {
+	// Assuming distances are already computed
+	double dx, dy, dr2, fx, fy, u;
+	long k = 0;
+	for (long i = 0 ; i < n_parts ; ++i) {
+		for (long j = 0 ; j < i ; ++j) {
+			dx = dists[0][k];
+			dy = dists[1][k++];
+			dr2 = (dx * dx + dy * dy) / sigma2;
+
+			if(dr2 * (1. - dr2) > 0.) {
+				u = HARMONIC_STRENGTH * (1.0 / std::sqrt(dr2) - 1.0);
+				fx = u * dx;
+				fy = u * dy;
+
+				forces[0][i] += fx;
+				forces[0][j] -= fx;
+				forces[1][i] += fy;
+				forces[1][j] -= fy;
+			}
+		}
+	}
 }
 
 void State::computeWCAForces() {
@@ -125,29 +179,29 @@ void State::computeWCAForces() {
 	}
 }
 
-/*
-//! Compute internal force between particles i and j (WCA potential)
-void State::calcWCAForce(const long i, const long j) {
-	double dx = positions[0][i] - positions[0][j];
-	double dy = positions[1][i] - positions[1][j];
-	// We want the periodized interval to be centered in 0
-	pbcSym(dx, Lx);
-	pbcSym(dy, Ly);
-	double dr2 = (dx * dx + dy * dy) / sigma2;
+void State::computeMagneticForces() {
+	// Assuming distances are already computed
+	double dx, dy, dr2, fx, fy, u;
+	long k = 0;
+	for (long i = 0 ; i < n_parts ; ++i) {
+		for (long j = 0 ; j < i ; ++j) {
+			dx = dists[0][k];
+			dy = dists[1][k++];
+			dr2 = dx * dx + dy * dy;
 
-	if(dr2 * (TWOONETHIRD - dr2) > 0.) {
-		double u = WCA_strength / sigma2;
-		u *= (48. * pow(dr2, -7.) - 24.*pow(dr2, -4.)); 
-		double fx = u * dx;
-		double fy = u * dy;
+			if(dr2 * (Ly * Ly / 4. - dr2) > 0.) {
+				u = 3 * mag_strength / pow(dr2, 2.5);
+				fx = u * dx;
+				fy = u * dy;
 
-		forces[0][i] += fx;
-		forces[0][j] -= fx;
-		forces[1][i] += fy;
-		forces[1][j] -= fy;
+				forces[0][i] += fx;
+				forces[0][j] -= fx;
+				forces[1][i] += fy;
+				forces[1][j] -= fy;
+			}
+		}
 	}
 }
-*/
 
 // Used only for tests outside of the class
 void State::calcDists(const std::vector<double> &pos_x,
@@ -187,6 +241,16 @@ void State::calcDists() {
 			dists[1][k++] = dy;
 		}
 	}
+}
+
+double State::minDistSq() const {
+	double minDist2 = Lx, dr2;
+	for (long k = 0 ; k < n_parts * (n_parts - 1) / 2 ; ++k) {
+		dr2 = dists[0][k] * dists[0][k] + dists[1][k] * dists[1][k];
+		if (dr2 < minDist2)
+			minDist2 = dr2;
+	}
+	return minDist2;
 }
 
 void State::enforcePBC() {

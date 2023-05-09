@@ -2,9 +2,11 @@
 #include <cmath>
 #include "ewald.h"
 
-Ewald::Ewald(double _Lx, double _Ly, double _alpha, long _N, bool _verbose) :
-	Lx(_Lx), Ly(_Ly), fac_x(1./_Lx), fac_y(1./_Ly), alpha(_alpha), N(_N),
-	verbose(_verbose), alpha2(_alpha * _alpha)
+Ewald::Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
+		     long _N, bool _verbose) :
+	Lx(_Lx), Ly(_Ly), fac_x(1./_Lx), fac_y(1./_Ly), alpha(_alpha),
+	hydro_strength(_hydro_strength), N(_N), verbose(_verbose),
+	alpha2(_alpha * _alpha)
 {
 	double safety = -std::log(EWALD_ERROR);
 
@@ -140,7 +142,7 @@ void Ewald::computeSelfInteraction() {
 void Ewald::computeForcesNaive(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y,
-		double Lx, double Ly) {
+		double hydro_strength, double Lx, double Ly) {
 	long N = pos_x.size();
 
 	for (long i = 0 ; i < N ; ++i) {
@@ -189,6 +191,10 @@ void Ewald::computeForcesNaive(
 			}
 		}
 	}
+	for (long i = 0 ; i < N ; ++i) {
+		forces_x[i] *= hydro_strength;
+		forces_y[i] *= hydro_strength;
+	}
 }
 
 void Ewald::computeForces(
@@ -208,6 +214,12 @@ void Ewald::computeForces(
 
 	// Real space contribution
 	addRealForces(dists_x, dists_y, forces_x, forces_y);
+
+	// The prefactor is only set here
+	for (long i = 0 ; i < N ; ++i) {
+		forces_x[i] *= hydro_strength;
+		forces_y[i] *= hydro_strength;
+	}
 }
 
 void Ewald::addFourierForces(

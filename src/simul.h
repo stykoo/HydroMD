@@ -31,7 +31,9 @@ class Simul {
 		double len_y; //!< Length in y direction
 		long n_parts; //!< Number of particles
 		double radius; //!< Radius of particle
+		double hydro_strength; //!< Strength of the hydrodynamic interaction
 		double WCA_strength; //!< Strength of the WCA potential
+		double mag_strength; //!< Strength of the magnetic interaction
 		double alpha_ew; //!< Parameter of Ewald algorithm
 		double dt; //!< Timestep
 		long n_iters; //!< Number of time iterations

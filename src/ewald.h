@@ -12,14 +12,14 @@
 
 class Ewald {
 	public:
-		Ewald(double _Lx, double _Ly, double _alpha, long _N,
-			  bool _verbose=false);
+		Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
+			  long _N, bool _verbose=false);
 		~Ewald();
 
 		static void computeForcesNaive(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y,
-			double Lx, double Ly); 
+			double hydro_strength, double Lx, double Ly); 
 		void computeForces(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			const std::vector<double> &dists_x,
@@ -48,6 +48,7 @@ class Ewald {
 		const double Lx, Ly; //!< Dimensions of the box
 		const double fac_x, fac_y; //!< Inverse dimensions of the box
 		const double alpha; //!< Parameter of Ewald algorithm
+		const double hydro_strength; //!< Strength of hydrodynamic interaction
 		const long N; //!< Number of particles
 		const bool verbose; //!< Verbose mode
 		const double alpha2;
