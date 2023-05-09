@@ -138,7 +138,7 @@ void State::computeHarmonicForces() {
 		for (long j = 0 ; j < i ; ++j) {
 			dx = dists[0][k];
 			dy = dists[1][k++];
-			dr2 = (dx * dx + dy * dy) / sigma2;
+			dr2 = (dx * dx + dy * dy) / (TWOONETHIRD * sigma2);
 
 			if(dr2 * (1. - dr2) > 0.) {
 				u = HARMONIC_STRENGTH * (1.0 / std::sqrt(dr2) - 1.0);
