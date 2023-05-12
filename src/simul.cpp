@@ -86,6 +86,14 @@ Simul::Simul(int argc, char **argv) {
 		status = SIMUL_INIT_FAILED;
 		return;
 	}
+
+	std::ifstream infile(output + "_pos.dat");
+	if (infile.good()) {
+		std::cerr << "Warning: " << output << "_pos.dat already exists. \n"
+		          << "Please remove it before running the simulation."
+				  << std::endl;
+		status = SIMUL_INIT_FAILED;
+	}
 }
 
 /*!
