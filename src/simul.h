@@ -40,6 +40,7 @@ class Simul {
 		long n_iters_th; //!< Number of time iterations of thermalization
 		long skip; //!< Iterations between two computation of observables
 		std::string output; //!< Name of the output file
+		std::string extend; //!< Name of the file to extend if any
 		bool export_pos; //!< Export positions
 		bool test; //!< Test mode
 		bool verbose; //!< Verbose mode

@@ -22,8 +22,10 @@ Simul::Simul(int argc, char **argv) {
 
 	po::options_description opts("Options");
 	opts.add_options()
-		("lx", po::value<double>(&len_x)->default_value(1.0), "")
-		("ly", po::value<double>(&len_y)->default_value(1.0), "")
+		("lx", po::value<double>(&len_x)->default_value(1.0),
+		 "Length in x direction")
+		("ly", po::value<double>(&len_y)->default_value(1.0),
+		 "Length in y direction")
 		("parts,n", po::value<long>(&n_parts)->required(),
 		 "Number of particles")
 		("radius,a", po::value<double>(&radius)->required(),
@@ -46,6 +48,8 @@ Simul::Simul(int argc, char **argv) {
 		("output,O",
 		 po::value<std::string>(&output)->default_value("observables"),
 		 "Name of the output file")
+		("extend,e", po::value<std::string>(&extend)->default_value(""),
+		 "Name of the file to extend if any")
 		("pos", po::bool_switch(&export_pos), "Export positions")
 		("test", po::bool_switch(&test), "Test mode")
 		("verbose,v", po::bool_switch(&verbose), "Verbose mode")
@@ -105,7 +109,7 @@ void Simul::run() {
 
 	// Initialize the state of the system
 	State state(len_x, len_y, n_parts, radius, hydro_strength, WCA_strength,
-			    mag_strength, dt, alpha_ew);
+			    mag_strength, dt, alpha_ew, extend);
 
 	if (verbose) {
 		std::cout << "System initialized\n";

@@ -33,7 +33,8 @@ class State {
 		//! Constructor of State
 		State(double _len_x, double _len_y, long _n_parts, double _a,
 		      double _hydro_strength, double _WCA_strength,
-			  double _mag_strength, double _dt, double _alpha_ew);
+			  double _mag_strength, double _dt, double _alpha_ew,
+			  std::string extend);
 		~State() {
 #ifdef USE_MKL
 			vslDeleteStream(&stream);
@@ -66,6 +67,7 @@ class State {
 		void computeHarmonicForces(); //!< Harmonic repulsive forces
 		void computeWCAForces(); //!< WCA repulsive forces
 		void computeMagneticForces(); //!< Magnetic forces
+		void loadPos(std::string fname);
 		void enforcePBC(); //!< Enforce periodic boundary conditions
 		void enforcePBC(double &x, double &y); //!< Same on specific numbers
 		double minDistSq() const;

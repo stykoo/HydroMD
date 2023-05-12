@@ -2,6 +2,8 @@
 #include <chrono>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include "state.h"
 
 /*!
@@ -11,7 +13,8 @@
  */
 State::State(double _len_x, double _len_y, long _n_parts, double _a,
 		     double _hydro_strength, double _WCA_strength,
-			 double _mag_strength, double _dt, double _alpha_ew) :
+			 double _mag_strength, double _dt, double _alpha_ew,
+			 std::string extend) :
 	Lx(_len_x), Ly(_len_y), fac_x(1. / _len_x), fac_y(1. / _len_y),
 	n_parts(_n_parts), sigma2(4 * _a * _a / TWOONETHIRD),
 	WCA_strength(_WCA_strength), mag_strength(_mag_strength), dt(_dt),
@@ -27,25 +30,33 @@ State::State(double _len_x, double _len_y, long _n_parts, double _a,
 	forces[1].assign(n_parts, 0);
 	dists[0].resize(n_parts * (n_parts - 1) / 2);
 	dists[1].resize(n_parts * (n_parts - 1) / 2);
-
 #ifdef USE_MKL
 	aux_x.resize(n_parts);
 	aux_y.resize(n_parts);
 	vslNewStream(&stream, VSL_BRNG_SFMT19937,
 		std::chrono::system_clock::now().time_since_epoch().count());
-	vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_parts,
-			     positions[0].data(), 0, Lx);
-	vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_parts,
-			     positions[1].data(), 0, Ly);
-#else
-    std::uniform_real_distribution<double> rnd(0, 1.);
-
-	for (long i = 0 ; i < n_parts ; ++i) {
-		positions[0][i] = Lx * rnd(rng);
-		positions[1][i] = Ly * rnd(rng);
-	}
 #endif
-	relax(); // Separate particles from one another
+
+	if (extend.empty()) {
+		// Generate new configuration
+#ifdef USE_MKL
+		vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_parts,
+					 positions[0].data(), 0, Lx);
+		vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_parts,
+					 positions[1].data(), 0, Ly);
+#else
+		std::uniform_real_distribution<double> rnd(0, 1.);
+
+		for (long i = 0 ; i < n_parts ; ++i) {
+			positions[0][i] = Lx * rnd(rng);
+			positions[1][i] = Ly * rnd(rng);
+		}
+#endif
+		relax(); // Separate particles from one another
+	} else {
+		// Load positions from file
+		loadPos(extend);
+	}
 }
 
 
@@ -72,7 +83,7 @@ void State::relax() {
 		minDist2 = minDistSq();
 		++n;
 	}
-	std::cout << "Min dist: " << sqrt(minDist2) << " (" << n << " iters)\n";
+	//std::cout << "Min dist: " << sqrt(minDist2) << " (" << n << " iters)\n";
 }
 
 /*!
@@ -94,6 +105,27 @@ void State::evolve() {
 void State::dump() const {
 	for (long i = 0 ; i < n_parts ; ++i) {
 		std::cout << positions[0][i] << " " << positions[1][i] << "\n";
+	}
+}
+
+void State::loadPos(std::string fname) {
+	std::ifstream ifile(fname);
+	if (!ifile.is_open()) {
+		std::cerr << "Could not find " << fname << "\n";
+		return;
+	}
+	std::string line0, line;
+	// Load last line (there should be a faster way)
+	while(std::getline(ifile, line0)) {
+		line = line0;
+	}
+	std::istringstream iss(line);
+
+	for (long i = 0 ; i < n_parts ; ++i) {
+		iss >> positions[0][i];
+	}
+	for (long i = 0 ; i < n_parts ; ++i) {
+		iss >> positions[1][i];
 	}
 }
 
