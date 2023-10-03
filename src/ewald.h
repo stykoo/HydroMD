@@ -13,13 +13,13 @@
 class Ewald {
 	public:
 		Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
-			  long _N, bool _verbose=false);
+			  double _theta, long _N, bool _verbose=false);
 		~Ewald();
 
 		static void computeForcesNaive(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			std::vector<double> &forces_x, std::vector<double> &forces_y,
-			double hydro_strength, double Lx, double Ly); 
+			double hydro_strength, double theta, double Lx, double Ly); 
 		void computeForces(
 			const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 			const std::vector<double> &dists_x,
@@ -49,6 +49,7 @@ class Ewald {
 		const double fac_x, fac_y; //!< Inverse dimensions of the box
 		const double alpha; //!< Parameter of Ewald algorithm
 		const double hydro_strength; //!< Strength of hydrodynamic interaction
+		const double ct, st; //!< cos and sin of the dipole angle
 		const long N; //!< Number of particles
 		const bool verbose; //!< Verbose mode
 		const double alpha2;
@@ -58,7 +59,7 @@ class Ewald {
 		long hi_x, hi_y; //!< Maximal images in x/y direction
 		bool no_image; //!< Don't need images
 
-		double fForceAvg_x; //!< Constant contribution
+		double fForceAvg_x, fForceAvg_y; //!< Constant contribution
 		std::vector<double> fVecs_x, fVecs_y; //!< Reciprocal space vectors G
 		//< Fourier space coefficients: (-1/V) (Gx/G^2) exp(-G^2/(4 alpha^2)) G
 		std::vector<double> fCoeffs_x, fCoeffs_y;

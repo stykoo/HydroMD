@@ -32,6 +32,7 @@ class Simul {
 		long n_parts; //!< Number of particles
 		double radius; //!< Radius of particle
 		double hydro_strength; //!< Strength of the hydrodynamic interaction
+		double theta_deg; //!< Angle of the hydrodynamic interactions
 		double WCA_strength; //!< Strength of the WCA potential
 		double mag_strength; //!< Strength of the magnetic interaction
 		double alpha_ew; //!< Parameter of Ewald algorithm

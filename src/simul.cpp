@@ -32,6 +32,8 @@ Simul::Simul(int argc, char **argv) {
 		 "Particle radius")
 		("hydro", po::value<double>(&hydro_strength)->default_value(1.0),
 		 "Strength of the hydrodynamic interaction")
+		("theta", po::value<double>(&theta_deg)->default_value(0.),
+		 "Angle of the hydrodynamic interaction")
 		("wca", po::value<double>(&WCA_strength)->default_value(1.0),
 		 "Strength of WCA potential")
 		("mag", po::value<double>(&mag_strength)->default_value(1.0),
@@ -116,8 +118,9 @@ void Simul::run() {
 	}
 
 	// Initialize the state of the system
-	State state(len_x, len_y, n_parts, radius, hydro_strength, WCA_strength,
-			    mag_strength, dt, alpha_ew, extend);
+	double theta = theta_deg * M_PI / 180.;
+	State state(len_x, len_y, n_parts, radius, hydro_strength, theta,
+			    WCA_strength, mag_strength, dt, alpha_ew, extend);
 
 	if (verbose) {
 		std::cout << "System initialized\n";
@@ -160,17 +163,19 @@ void Simul::print(std::ostream &stream) const {
 	stream << "# ";
 	stream << "len_x=" << len_x << ", len_y=" << len_y << ", n_parts="
 			  << n_parts << ", radius=" << radius << ", hydro_strength="
-			  << hydro_strength << ", WCA_strength=" << WCA_strength
-			  << ", mag_strength=" << mag_strength << ", alpha=" << alpha_ew
-			  << ", dt=" << dt << ", n_iters=" << n_iters << ", n_iters_th="
-			  << n_iters_th << ", skip=" << skip << "\n";
+			  << hydro_strength << ", theta=" << theta_deg << ", WCA_strength="
+			  << WCA_strength << ", mag_strength=" << mag_strength
+			  << ", alpha=" << alpha_ew << ", dt=" << dt << ", n_iters="
+			  << n_iters << ", n_iters_th=" << n_iters_th << ", skip="
+			  << skip << "\n";
 	stream << std::endl;
 }
 
 int testEwald() {
-	//double Lx = 1.5, Ly = 1.;
-	double Lx = 1., Ly = 1.;
+	double Lx = 1.5, Ly = 1.;
+	//double Lx = 1., Ly = 1.;
 	double hydro_strength = 1.;
+	double theta = 78. * M_PI / 180.;
 	std::vector<double> alphas = {1, 1.5, 2., 2.5, 3};
 
 	long N = 5;
@@ -188,10 +193,14 @@ int testEwald() {
 	std::vector<double> force_x(N, 0.), force_y(N, 0.);
 	std::vector<double> dists_x, dists_y;
 
+	std::cout << "Testing Ewald method: N=" << N << ", Lx=" << Lx << ", Ly="
+		<< Ly << ", hydro_strength=" << hydro_strength << ", theta=" << theta
+		<< "\n";
+
 	State::calcDists(pos_x, pos_y, dists_x, dists_y, Lx, Ly);
 
 	Ewald::computeForcesNaive(pos_x, pos_y, force_x0, force_y0, hydro_strength,
-			                  Lx, Ly);
+			                  theta, Lx, Ly);
 	for (size_t i = 0 ; i < pos_x.size() ; ++i) {
 		std::cout << std::setprecision(10)
 			<< force_x0[i] << " " << force_y0[i] << "\n";
@@ -199,7 +208,7 @@ int testEwald() {
 
 	double max_err = 0., err;
 	for (double alpha : alphas) {
-		Ewald ew(Lx, Ly, alpha, hydro_strength, N, false);
+		Ewald ew(Lx, Ly, alpha, hydro_strength, theta, N, false);
 		ew.computeForces(pos_x, pos_y, dists_x, dists_y, force_x, force_y);
 		for (size_t i = 0 ; i < pos_x.size() ; ++i) {
 			std::cout << std::setprecision(10)
