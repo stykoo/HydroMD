@@ -12,13 +12,13 @@
  * Initializes the state of the system: particles randomly placed in a 2d box.
  */
 State::State(double _len_x, double _len_y, long _n_parts, double _a,
-		     double _hydro_strength, double _WCA_strength,
-			 double _mag_strength, double _dt, double _alpha_ew,
-			 std::string extend) :
+             double _hydro_strength, double _theta, double _WCA_strength,
+	     double _mag_strength, double _dt, double _alpha_ew,
+	     std::string extend) :
 	Lx(_len_x), Ly(_len_y), fac_x(1. / _len_x), fac_y(1. / _len_y),
 	n_parts(_n_parts), sigma2(4 * _a * _a / TWOONETHIRD),
 	WCA_strength(_WCA_strength), mag_strength(_mag_strength), dt(_dt),
-	ewald(_len_x, _len_y, _alpha_ew, _hydro_strength, _n_parts)
+	ewald(_len_x, _len_y, _alpha_ew, _hydro_strength, _theta, _n_parts)
 #ifdef USE_MKL
 #else
 	, rng(std::chrono::system_clock::now().time_since_epoch().count())

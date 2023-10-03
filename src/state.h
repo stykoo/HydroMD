@@ -32,9 +32,9 @@ class State {
 	public:
 		//! Constructor of State
 		State(double _len_x, double _len_y, long _n_parts, double _a,
-		      double _hydro_strength, double _WCA_strength,
-			  double _mag_strength, double _dt, double _alpha_ew,
-			  std::string extend);
+		      double _hydro_strength, double _theta, double _WCA_strength,
+		      double _mag_strength, double _dt, double _alpha_ew,
+		      std::string extend);
 		~State() {
 #ifdef USE_MKL
 			vslDeleteStream(&stream);

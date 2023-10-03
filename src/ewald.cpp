@@ -3,10 +3,10 @@
 #include "ewald.h"
 
 Ewald::Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
-		     long _N, bool _verbose) :
+		     double _theta, long _N, bool _verbose) :
 	Lx(_Lx), Ly(_Ly), fac_x(1./_Lx), fac_y(1./_Ly), alpha(_alpha),
-	hydro_strength(_hydro_strength), N(_N), verbose(_verbose),
-	alpha2(_alpha * _alpha)
+	hydro_strength(_hydro_strength), ct(std::cos(_theta)),
+	st(std::sin(_theta)), N(_N), verbose(_verbose), alpha2(_alpha * _alpha)
 {
 	double safety = -std::log(EWALD_ERROR);
 
@@ -22,10 +22,11 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
 	double nf2Max = 4 * alpha2 * safety; // Max norm of Fourier vectors
 	long fRangeX = (long) (std::sqrt(nf2Max) * Lx / twopi);
 	long fRangeY = (long) (std::sqrt(nf2Max) * Ly / twopi);
-	fForceAvg_x = -1. / (2 * Lx * Ly);
+	fForceAvg_x = -ct / (2 * Lx * Ly);
+	fForceAvg_y = -st / (2 * Lx * Ly);
 
 	// Building Fourier vectors
-	double kx, ky, k2, c;
+	double kx, ky, k2, kpar, c;
 	for (long mx=-fRangeX ; mx<=fRangeX ; ++mx) {
 		kx = 2 * M_PI * mx / Lx;
 		for (long my=1 ; my<=fRangeY ; ++my) {
@@ -34,7 +35,8 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
 			if (k2 < nf2Max) {
 				fVecs_x.push_back(kx);
 				fVecs_y.push_back(ky);
-				c = kx  * std::exp(-k2 / (4. * alpha2)) / k2;
+				kpar = kx * ct + ky * st;
+				c = kpar  * std::exp(-k2 / (4. * alpha2)) / k2;
 				c *= -2 / (Lx * Ly); // Factor 2 because of symmetry
 				fCoeffs_x.push_back(c * kx);
 				fCoeffs_y.push_back(c * ky);
@@ -48,7 +50,8 @@ Ewald::Ewald(double _Lx, double _Ly, double _alpha, double _hydro_strength,
 		if (k2 < nf2Max) {
 			fVecs_x.push_back(kx);
 			fVecs_y.push_back(ky);
-			c = kx  * std::exp(-k2 / (4. * alpha2)) / k2;
+			kpar = kx * ct + ky * st;
+			c = kpar  * std::exp(-k2 / (4. * alpha2)) / k2;
 			c *= -2 / (Lx * Ly);
 			fCoeffs_x.push_back(c * kx);
 			fCoeffs_y.push_back(c * ky);
@@ -118,7 +121,7 @@ void Ewald::computeSelfInteraction() {
 	long hi_xA = (long) std::ceil(rRangeA / Lx);
 	long hi_yA = (long) std::ceil(rRangeA / Ly);
 	//std::cout << rRangeA << ", " << hi_xA << ", " << hi_yA << "\n";
-	double x, y, r2, px, py; 
+	double x, y, r2, rpar, px, py; 
 
 	force_self_x = 0.;
 	force_self_y = 0.;
@@ -129,10 +132,11 @@ void Ewald::computeSelfInteraction() {
 			y = b * Ly;
 			r2 = x * x + y * y;
 			if (r2 > 0 && r2 < rRange2A) {
-				px = x * x / r2;
-				py = x * y / r2;
-				force_self_x += (2 * px - 1) / r2 / (2. * M_PI);
-				force_self_y += 2 * py / r2 / (2. * M_PI);
+				rpar = x * ct + y * st;
+				px = rpar * x / r2;
+				py = rpar * y / r2;
+				force_self_x += (2 * px - ct) / r2 / (2. * M_PI);
+				force_self_y += (2 * py - st) / r2 / (2. * M_PI);
 			}
 		}
 	}
@@ -142,8 +146,10 @@ void Ewald::computeSelfInteraction() {
 void Ewald::computeForcesNaive(
 		const std::vector<double> &pos_x, const std::vector<double> &pos_y,
 		std::vector<double> &forces_x, std::vector<double> &forces_y,
-		double hydro_strength, double Lx, double Ly) {
+		double hydro_strength, double theta, double Lx, double Ly) {
 	long N = pos_x.size();
+	double ct = std::cos(theta);
+	double st = std::sin(theta);
 
 	for (long i = 0 ; i < N ; ++i) {
 		forces_x[i] = 0;
@@ -154,7 +160,7 @@ void Ewald::computeForcesNaive(
 	double rRangeA = sqrt(rRange2A);
 	long hi_xA = (long) std::ceil(rRangeA / Lx);
 	long hi_yA = (long) std::ceil(rRangeA / Ly);
-	double dx, dy, x, y, r2, px, py, fx, fy; 
+	double dx, dy, x, y, r2, rpar, px, py, fx, fy; 
 
 	for (long i = 0 ; i < N ; ++i) {
 		for (long j = 0 ; j <= i ; ++j) {
@@ -176,10 +182,11 @@ void Ewald::computeForcesNaive(
 					y = dy - b * Ly;
 					r2 = x * x + y * y;
 					if (r2 > 0 && r2 < rRange2A) {
-						px = x * x / r2;
-						py = x * y / r2;
-						fx += (2 * px - 1) / r2 / (2. * M_PI);
-						fy += 2 * py / r2 / (2. * M_PI);
+						rpar = x * ct + y * st;
+						px = rpar * x / r2;
+						py = rpar * y / r2;
+						fx += (2 * px - ct) / r2 / (2. * M_PI);
+						fy += (2 * py - st) / r2 / (2. * M_PI);
 					}
 				}
 			}
@@ -263,6 +270,7 @@ void Ewald::addFourierForces(
 	// Constant contribution
 	for (long i = 0 ; i < N ; ++i) {
 		forces_x[i] += (N - 1) * fForceAvg_x;
+		forces_y[i] += (N - 1) * fForceAvg_y;
 	}
 }
 
@@ -334,23 +342,22 @@ void Ewald::addRealForces(
 void Ewald::realForceNoImage(double dx, double dy, double dr2,
 		double &fx, double &fy) {
 	// No images, no check for range
-	double pref, px, py;
+	double drpar, pref, px, py;
 	fx = 0.;
 	fy = 0.;
 
+	drpar = dx * ct + dy * st;
 	pref = std::exp(-alpha2 * dr2) / (2. * M_PI);
-	px = dx * dx / dr2;
-	py = dx * dy / dr2;
+	px = drpar * dx / dr2;
+	py = drpar * dy / dr2;
 	fx += pref * 2 * alpha2 * px;
 	fy += pref * 2 * alpha2 * py;
-	px = (2 * px - 1) / dr2;
-	py = 2 * py / dr2;
-	fx += pref * px;
-	fy += pref * py;
+	fx += pref * (2 * px - ct) / dr2;
+	fy += pref * (2 * py - st) / dr2;
 }
 
 void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
-	double dx0, dy0, dr2, pref, px, py;
+	double dx0, dy0, dr2, drpar, pref, px, py;
 	fx = 0.;
 	fy = 0.;
 
@@ -361,15 +368,14 @@ void Ewald::realForce(double dx, double dy, double &fx, double &fy) {
 			dy0 = dy - b * Ly;
 			dr2 = dx0 * dx0 + dy0 * dy0;
 			if (dr2 > 0 && dr2 < rRange2) {
+				drpar = dx0 * ct + dy0 * st;
 				pref = std::exp(-alpha2 * dr2) / (2. * M_PI);
-				px = dx0 * dx0 / dr2;
-				py = dx0 * dy0 / dr2;
+				px = drpar * dx0 / dr2;
+				py = drpar * dy0 / dr2;
 				fx += pref * 2 * alpha2 * px;
 				fy += pref * 2 * alpha2 * py;
-				px = (2 * px - 1) / dr2;
-				py = 2 * py / dr2;
-				fx += pref * px;
-				fy += pref * py;
+				fx += pref * (2 * px - ct) / dr2;
+				fy += pref * (2 * py - st) / dr2;
 			}
 		}
 	}
