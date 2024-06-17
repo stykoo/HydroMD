@@ -130,6 +130,7 @@ void Simul::run() {
 
 	if (dump_forces) {
 		state.dumpHydroForces();
+		return;
 	}
 	
 	// Thermalization
