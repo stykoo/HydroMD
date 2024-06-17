@@ -53,6 +53,8 @@ Simul::Simul(int argc, char **argv) {
 		("extend,e", po::value<std::string>(&extend)->default_value(""),
 		 "Name of the file to extend if any")
 		("pos", po::bool_switch(&export_pos), "Export positions")
+		("forces", po::bool_switch(&dump_forces),
+		 "Dump hydro forces at initial time and return")
 		("test", po::bool_switch(&test), "Test mode")
 		("verbose,v", po::bool_switch(&verbose), "Verbose mode")
 		("help,h", "Print help message and exit")
@@ -124,6 +126,10 @@ void Simul::run() {
 
 	if (verbose) {
 		std::cout << "System initialized\n";
+	}
+
+	if (dump_forces) {
+		state.dumpHydroForces();
 	}
 	
 	// Thermalization

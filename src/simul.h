@@ -43,6 +43,7 @@ class Simul {
 		std::string output; //!< Name of the output file
 		std::string extend; //!< Name of the file to extend if any
 		bool export_pos; //!< Export positions
+		bool dump_forces; //!< Dump the hydro forces at initial time and exit
 		bool test; //!< Test mode
 		bool verbose; //!< Verbose mode
 

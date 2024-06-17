@@ -162,6 +162,24 @@ void State::calcForces() {
 	computeMagneticForces();
 }
 
+void State::dumpHydroForces() {
+    for (long i = 0 ; i < n_parts ; ++i) {
+		forces[0][i] = 0;
+		forces[1][i] = 0;
+    }
+
+	// Compute distances
+	calcDists();
+
+	// Ewald
+	ewald.computeForces(positions[0], positions[1], dists[0], dists[1],
+			            forces[0], forces[1]);
+
+	for (long i = 0 ; i < n_parts ; ++i) {
+		std::cout << forces[0][i] << " " << forces[1][i] << "\n";
+	}
+}
+
 void State::computeHarmonicForces() {
 	// Assuming distances are already computed
 	double dx, dy, dr2, fx, fy, u;

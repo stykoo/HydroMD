@@ -52,6 +52,7 @@ class State {
 		}
 
 		void dump() const; //!< Dump the positions
+		void dumpHydroForces(); //!< Dump the hydrodynamic forces
 		void writePos(std::ostream &stream) const;
 		//! For use outside of the class
 		static void calcDists(const std::vector<double> &pos_x,
